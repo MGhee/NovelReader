@@ -137,7 +137,7 @@ class SyncRepository @Inject constructor(
                         "siteUrl" to book.url,
                         "title" to book.title,
                         "status" to if (book.completed) "COMPLETED" else "READING",
-                        "currentChapter" to currentChapterPosition.toString(),
+                        "currentChapter" to (currentChapterPosition + 1).toString(),
                         "totalChapters" to chapters.size.toString(),
                         "updatedAt" to System.currentTimeMillis().toString(),
                     )
