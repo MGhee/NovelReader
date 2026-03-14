@@ -1,0 +1,696 @@
+package my.novelreader.features.reader.features
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import my.novelreader.core.Response
+import my.novelreader.features.reader.ReaderRepository
+import my.novelreader.features.reader.domain.ChapterLoaded
+import my.novelreader.features.reader.domain.ChapterState
+import my.novelreader.features.reader.domain.ChapterStats
+import my.novelreader.features.reader.domain.ChapterUrl
+import my.novelreader.features.reader.domain.InitialPositionChapter
+import my.novelreader.features.reader.domain.ReaderItem
+import my.novelreader.features.reader.domain.ReaderState
+import my.novelreader.features.reader.domain.ReadingChapterPosStats
+import my.novelreader.features.reader.domain.indexOfReaderItem
+import my.novelreader.features.reader.tools.textToItemsConverter
+import my.novelreader.features.reader.ui.ReaderViewHandlersActions
+import my.novelreader.feature.local_database.DAOs.ChapterTranslationDao
+import my.novelreader.feature.local_database.tables.Chapter
+import my.novelreader.feature.local_database.tables.ChapterTranslation
+import kotlin.coroutines.CoroutineContext
+
+internal class ReaderChaptersLoader(
+    private val readerRepository: ReaderRepository,
+    private val translatorTranslateOrNull: suspend (text: String) -> String?,
+    private val translatorIsActive: () -> Boolean,
+    private val translatorSourceLanguageOrNull: () -> String?,
+    private val translatorTargetLanguageOrNull: () -> String?,
+    private val translatorProvider: () -> String, // "gemini" or "google"
+    private val translatorBatchTranslateOrNull: () -> (suspend (List<String>) -> Map<String, String>)?,
+    private val bookUrl: String,
+    val orderedChapters: List<Chapter>,
+    @Volatile var readerState: ReaderState,
+    private val readerViewHandlersActions: ReaderViewHandlersActions,
+    private val chapterTranslationDao: ChapterTranslationDao,
+) : CoroutineScope {
+
+    override val coroutineContext: CoroutineContext = SupervisorJob() + Dispatchers.Main.immediate
+    
+    // Cache for pre-translated chapters
+    private val preTranslatedChapters = mutableMapOf<String, Map<String, String>>()
+    // Track which chapters are currently being pre-translated to avoid duplicates
+    private val preTranslatingChapters = mutableSetOf<String>()
+
+    /**
+     * Clear all translation caches (used when refreshing translations)
+     */
+    fun clearTranslationCache() {
+        android.util.Log.d("ReaderChaptersLoader", "clearTranslationCache: clearing ${preTranslatedChapters.size} pre-translated chapters")
+        preTranslatedChapters.clear()
+        preTranslatingChapters.clear()
+    }
+
+    private sealed interface LoadChapter {
+        enum class Type { RestartInitial, Initial, Previous, Next }
+        data class RestartInitialChapter(val state: ChapterState) : LoadChapter
+        data class Initial(val chapterIndex: Int) : LoadChapter
+        data object Previous : LoadChapter
+        data object Next : LoadChapter
+    }
+
+    val chaptersStats = mutableMapOf<ChapterUrl, ChapterStats>()
+    val loadedChapters = mutableSetOf<ChapterUrl>()
+    val chapterLoadedFlow = MutableSharedFlow<ChapterLoaded>()
+    private val items: MutableList<ReaderItem> = ArrayList()
+    private val loaderQueue = mutableSetOf<LoadChapter.Type>()
+    private val chapterLoaderFlow = MutableSharedFlow<LoadChapter>()
+
+    init {
+        startChapterLoaderWatcher()
+    }
+
+    fun getItems(): List<ReaderItem> = items
+    fun getItemContext(itemIndex: Int, chapterUrl: String): ReadingChapterPosStats? {
+        val item = items.getOrNull(itemIndex) ?: return null
+        if (item !is ReaderItem.Position) return null
+        val chapterStats = chaptersStats[chapterUrl] ?: return null
+        return ReadingChapterPosStats(
+            chapterIndex = item.chapterIndex,
+            chapterCount = orderedChapters.size,
+            chapterItemPosition = item.chapterItemPosition,
+            chapterItemsCount = chapterStats.itemsCount,
+            chapterTitle = chapterStats.chapter.title,
+            chapterUrl = chapterStats.chapter.url,
+        )
+    }
+
+    fun getItemContext(chapterIndex: Int, chapterItemPosition: Int): ReadingChapterPosStats? {
+        val itemIndex = indexOfReaderItem(
+            list = items,
+            chapterIndex = chapterIndex,
+            chapterItemPosition = chapterItemPosition
+        )
+        val item = items.getOrNull(itemIndex) ?: return null
+        if (item !is ReaderItem.Position) return null
+        val chapterStats = chaptersStats[item.chapterUrl] ?: return null
+        return ReadingChapterPosStats(
+            chapterIndex = chapterIndex,
+            chapterCount = orderedChapters.size,
+            chapterItemPosition = item.chapterItemPosition,
+            chapterItemsCount = chapterStats.itemsCount,
+            chapterTitle = chapterStats.chapter.title,
+            chapterUrl = chapterStats.chapter.url,
+        )
+    }
+
+
+    fun isLastChapter(chapterIndex: Int): Boolean = chapterIndex == orderedChapters.lastIndex
+    fun isChapterIndexLoaded(chapterIndex: Int): Boolean {
+        return orderedChapters.getOrNull(chapterIndex)?.url
+            ?.let { loadedChapters.contains(it) }
+            ?: false
+    }
+
+    fun isChapterIndexValid(chapterIndex: Int) =
+        0 <= chapterIndex && chapterIndex < orderedChapters.size
+
+    @Synchronized
+    fun tryLoadInitial(chapterIndex: Int) {
+        if (LoadChapter.Type.Initial in loaderQueue) return
+        loaderQueue.add(LoadChapter.Type.Initial)
+        launch {
+            chapterLoaderFlow.emit(LoadChapter.Initial(chapterIndex = chapterIndex))
+        }
+    }
+
+    @Synchronized
+    fun tryLoadRestartedInitial(chapterLastState: ChapterState) {
+        if (LoadChapter.Type.RestartInitial in loaderQueue) return
+        loaderQueue.add(LoadChapter.Type.RestartInitial)
+        launch {
+            chapterLoaderFlow.emit(LoadChapter.RestartInitialChapter(state = chapterLastState))
+        }
+    }
+
+    @Synchronized
+    fun tryLoadPrevious() {
+        if (LoadChapter.Type.Previous in loaderQueue) return
+        loaderQueue.add(LoadChapter.Type.Previous)
+        launch { chapterLoaderFlow.emit(LoadChapter.Previous) }
+    }
+
+    @Synchronized
+    fun tryLoadNext() {
+        if (LoadChapter.Type.Next in loaderQueue) return
+        loaderQueue.add(LoadChapter.Type.Next)
+        launch { chapterLoaderFlow.emit(LoadChapter.Next) }
+    }
+
+    fun reload() {
+        coroutineContext.cancelChildren()
+        loaderQueue.clear()
+        launch(Dispatchers.Main.immediate) {
+            items.clear()
+            readerViewHandlersActions.doForceUpdateListViewState()
+            loadedChapters.clear()
+            preTranslatedChapters.clear()
+            preTranslatingChapters.clear()
+            readerState = ReaderState.INITIAL_LOAD
+            startChapterLoaderWatcher()
+        }
+    }
+    
+    /**
+     * Pre-translate the next chapter in background to improve UX
+     */
+    fun preTranslateNextChapter(currentChapterIndex: Int) {
+        val batchTranslator = translatorBatchTranslateOrNull()
+        if (!translatorIsActive() || batchTranslator == null) return
+        
+        val nextIndex = currentChapterIndex + 1
+        if (nextIndex >= orderedChapters.size) return
+        
+        val nextChapter = orderedChapters[nextIndex]
+        
+        // Already cached or currently translating - skip
+        if (preTranslatedChapters.containsKey(nextChapter.url)) {
+            android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Chapter ${nextChapter.title} already cached")
+            return
+        }
+        if (preTranslatingChapters.contains(nextChapter.url)) {
+            android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Chapter ${nextChapter.title} already in progress")
+            return
+        }
+        
+        // Mark as translating
+        preTranslatingChapters.add(nextChapter.url)
+        android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Starting for chapter ${nextChapter.title}")
+        
+        launch(Dispatchers.IO) {
+            try {
+                val res = readerRepository.downloadChapter(nextChapter.url)
+                if (res is Response.Success) {
+                    val itemsOriginal = textToItemsConverter(
+                        chapterUrl = nextChapter.url,
+                        chapterIndex = nextIndex,
+                        chapterItemPositionDisplacement = 0,
+                        text = res.data,
+                    )
+                    
+                    val textsToTranslate = itemsOriginal.filterIsInstance<ReaderItem.Body>()
+                        .map { it.text }
+                    
+                    if (textsToTranslate.isNotEmpty()) {
+                        android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Translating ${textsToTranslate.size} paragraphs")
+                        val translations = batchTranslator.invoke(textsToTranslate)
+                        
+                        // Save to database for persistence across sessions
+                        val sourceLang = translatorSourceLanguageOrNull() ?: "en"
+                        val targetLang = translatorTargetLanguageOrNull() ?: "zh"
+                        val translationEntities = translations.map { (original, translated) ->
+                            ChapterTranslation(
+                                chapterUrl = nextChapter.url,
+                                sourceLang = sourceLang,
+                                targetLang = targetLang,
+                                originalText = original,
+                                translatedText = translated
+                            )
+                        }
+                        chapterTranslationDao.insertReplace(translationEntities)
+                        android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Saved ${translationEntities.size} translations to database")
+                        
+                        // Also keep in memory cache for immediate use
+                        preTranslatedChapters[nextChapter.url] = translations
+                        android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Completed, cached ${translations.size} translations")
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ReaderChaptersLoader", "Pre-translation: Failed - ${e.message}")
+            } finally {
+                preTranslatingChapters.remove(nextChapter.url)
+            }
+        }
+    }
+
+    private fun startChapterLoaderWatcher() {
+        launch {
+            chapterLoaderFlow
+                .collect {
+                    when (it) {
+                        is LoadChapter.Initial -> {
+                            loadInitialChapter(chapterIndex = it.chapterIndex)
+                            removeQueueItem(LoadChapter.Type.Initial)
+                        }
+                        is LoadChapter.Next -> {
+                            loadNextChapter()
+                            removeQueueItem(LoadChapter.Type.Next)
+                        }
+                        is LoadChapter.Previous -> {
+                            loadPreviousChapter()
+                            removeQueueItem(LoadChapter.Type.Previous)
+                        }
+                        is LoadChapter.RestartInitialChapter -> {
+                            loadRestartedInitialChapter(chapterLastState = it.state)
+                            removeQueueItem(LoadChapter.Type.RestartInitial)
+                        }
+                    }
+                }
+        }
+    }
+
+    @Synchronized
+    private fun removeQueueItem(type: LoadChapter.Type) {
+        loaderQueue.remove(type)
+    }
+
+    private suspend fun loadRestartedInitialChapter(
+        chapterLastState: ChapterState
+    ) = withContext(Dispatchers.Main.immediate) {
+        readerState = ReaderState.INITIAL_LOAD
+        items.clear()
+        readerViewHandlersActions.doForceUpdateListViewState()
+
+        val insert: suspend (ReaderItem) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.add(it)
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+        val insertAll: suspend (Collection<ReaderItem>) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.addAll(it)
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+        val remove: suspend (ReaderItem) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.remove(it)
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+        val index = orderedChapters.indexOfFirst { it.url == chapterLastState.chapterUrl }
+        if (index == -1) {
+            readerViewHandlersActions.doShowInvalidChapterDialog()
+            return@withContext
+        }
+
+        addChapter(
+            chapterIndex = index,
+            insert = insert,
+            insertAll = insertAll,
+            remove = remove,
+            maintainPosition = readerViewHandlersActions::doMaintainStartPosition,
+        )
+
+        readerViewHandlersActions.doForceUpdateListViewState()
+        readerViewHandlersActions.doSetInitialPosition(
+            InitialPositionChapter(
+                chapterIndex = index,
+                chapterItemPosition = chapterLastState.chapterItemPosition,
+                chapterItemOffset = chapterLastState.offset
+            )
+        )
+
+        readerState = ReaderState.IDLE
+
+        chapterLoadedFlow.emit(
+            ChapterLoaded(
+                chapterIndex = index,
+                type = ChapterLoaded.Type.Initial
+            )
+        )
+    }
+
+    private suspend fun loadInitialChapter(
+        chapterIndex: Int
+    ) = withContext(Dispatchers.Main.immediate) {
+        readerState = ReaderState.INITIAL_LOAD
+        items.clear()
+        readerViewHandlersActions.doForceUpdateListViewState()
+
+        val validIndex = chapterIndex >= 0 && chapterIndex < orderedChapters.size
+        if (!validIndex) {
+            readerViewHandlersActions.doShowInvalidChapterDialog()
+            return@withContext
+        }
+
+        val insert: suspend (ReaderItem) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.add(it)
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+
+        val insertAll: suspend (Collection<ReaderItem>) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.addAll(it)
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+
+        val remove: suspend (ReaderItem) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.remove(it)
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+
+        addChapter(
+            chapterIndex = chapterIndex,
+            insert = insert,
+            insertAll = insertAll,
+            remove = remove,
+            maintainPosition = readerViewHandlersActions::doMaintainStartPosition,
+        )
+
+
+        val chapter = orderedChapters[chapterIndex]
+        val initialPosition = readerRepository.getInitialChapterItemPosition(
+            bookUrl = bookUrl,
+            chapterIndex = chapter.position,
+            chapter = chapter,
+        )
+
+        readerViewHandlersActions.doForceUpdateListViewState()
+        readerViewHandlersActions.doSetInitialPosition(initialPosition)
+
+        chapterLoadedFlow.emit(
+            ChapterLoaded(
+                chapterIndex = chapterIndex,
+                type = ChapterLoaded.Type.Initial
+            )
+        )
+
+        readerState = ReaderState.IDLE
+    }
+
+    private suspend fun loadPreviousChapter() = withContext(Dispatchers.Main.immediate) {
+        readerState = ReaderState.LOADING
+
+        val firstItem = items.firstOrNull()!!
+        if (firstItem is ReaderItem.BookStart) {
+            readerState = ReaderState.IDLE
+            return@withContext
+        }
+
+        var listIndex = 0
+        val insert: suspend (ReaderItem) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.add(listIndex, it)
+                listIndex += 1
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+        val insertAll: suspend (Collection<ReaderItem>) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.addAll(listIndex, it)
+                listIndex += it.size
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+        val remove: suspend (ReaderItem) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                val isRemoved = items.remove(it)
+                if (isRemoved) {
+                    listIndex -= 1
+                }
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+
+        val previousIndex = firstItem.chapterIndex - 1
+        if (previousIndex < 0) {
+            readerViewHandlersActions.doMaintainLastVisiblePosition {
+                insert(ReaderItem.BookStart(chapterIndex = previousIndex))
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+            readerState = ReaderState.IDLE
+            return@withContext
+        }
+
+        addChapter(
+            chapterIndex = previousIndex,
+            insert = insert,
+            insertAll = insertAll,
+            remove = remove,
+            maintainPosition = readerViewHandlersActions::doMaintainLastVisiblePosition,
+        )
+
+        chapterLoadedFlow.emit(
+            ChapterLoaded(
+                chapterIndex = previousIndex,
+                type = ChapterLoaded.Type.Previous
+            )
+        )
+
+        readerState = ReaderState.IDLE
+    }
+
+    private suspend fun loadNextChapter() = withContext(Dispatchers.Main.immediate) {
+        readerState = ReaderState.LOADING
+
+        val lastItem = items.lastOrNull()!!
+        if (lastItem is ReaderItem.BookEnd) {
+            readerState = ReaderState.IDLE
+            return@withContext
+        }
+
+        val insert: suspend (ReaderItem) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.add(it)
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+        val insertAll: suspend (Collection<ReaderItem>) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.addAll(it)
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+        val remove: suspend (ReaderItem) -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
+                items.remove(it)
+                readerViewHandlersActions.doForceUpdateListViewState()
+            }
+        }
+
+        val nextIndex = lastItem.chapterIndex + 1
+        if (nextIndex >= orderedChapters.size) {
+            insert(ReaderItem.BookEnd(chapterIndex = nextIndex))
+            readerViewHandlersActions.doForceUpdateListViewState()
+            readerState = ReaderState.IDLE
+            return@withContext
+        }
+
+        addChapter(
+            chapterIndex = nextIndex,
+            insert = insert,
+            insertAll = insertAll,
+            remove = remove,
+        )
+
+        chapterLoadedFlow.emit(
+            ChapterLoaded(
+                chapterIndex = nextIndex,
+                type = ChapterLoaded.Type.Next
+            )
+        )
+
+        readerState = ReaderState.IDLE
+    }
+
+    private suspend fun addChapter(
+        chapterIndex: Int,
+        insert: suspend (ReaderItem) -> Unit,
+        insertAll: suspend (Collection<ReaderItem>) -> Unit,
+        remove: suspend (ReaderItem) -> Unit,
+        maintainPosition: suspend (suspend () -> Unit) -> Unit = { it() },
+    ) = withContext(Dispatchers.Default) {
+        val chapter = orderedChapters[chapterIndex]
+        val itemProgressBar = ReaderItem.Progressbar(chapterIndex = chapterIndex)
+        var chapterItemPosition = 0
+        val itemTitle = ReaderItem.Title(
+            chapterUrl = chapter.url,
+            chapterIndex = chapterIndex,
+            text = chapter.title,
+            chapterItemPosition = chapterItemPosition,
+        ).copy(
+            textTranslated = translatorTranslateOrNull(chapter.title) ?: chapter.title
+        )
+        chapterItemPosition += 1
+
+        maintainPosition {
+            insert(ReaderItem.Divider(chapterIndex = chapterIndex))
+            insert(itemTitle)
+            insert(itemProgressBar)
+            readerViewHandlersActions.doForceUpdateListViewState()
+        }
+
+        when (val res = readerRepository.downloadChapter(chapter.url)) {
+            is Response.Success -> {
+                // Split chapter text into items
+                val itemsOriginal = textToItemsConverter(
+                    chapterUrl = chapter.url,
+                    chapterIndex = chapterIndex,
+                    chapterItemPositionDisplacement = chapterItemPosition,
+                    text = res.data,
+                )
+                chapterItemPosition += itemsOriginal.size
+
+                val itemTranslationAttribution = if (translatorIsActive()) {
+                    ReaderItem.TranslateAttribution(
+                        chapterIndex = chapterIndex,
+                        provider = translatorProvider()
+                    )
+                } else null
+
+                val itemTranslating = if (translatorIsActive()) {
+                    ReaderItem.Translating(
+                        chapterIndex = chapterIndex,
+                        sourceLang = translatorSourceLanguageOrNull() ?: "",
+                        targetLang = translatorTargetLanguageOrNull() ?: "",
+                    )
+                } else null
+
+                if (itemTranslating != null) {
+                    maintainPosition {
+                        insert(itemTranslating)
+                        readerViewHandlersActions.doForceUpdateListViewState()
+                    }
+                }
+
+                // Translate if necessary
+                val items = when {
+                    translatorIsActive() -> {
+                        val sourceLang = translatorSourceLanguageOrNull() ?: "en"
+                        val targetLang = translatorTargetLanguageOrNull() ?: "zh"
+                        val batchTranslator = translatorBatchTranslateOrNull()
+                        
+                        if (batchTranslator != null) {
+                            // 1. Check memory cache first
+                            val memCachedTranslations = preTranslatedChapters[chapter.url]
+                            if (memCachedTranslations != null) {
+                                android.util.Log.d("ReaderChaptersLoader", "Using MEMORY CACHE for chapter ${chapter.title} (${memCachedTranslations.size} translations)")
+                                preTranslatedChapters.remove(chapter.url) // Clear after use
+                                
+                                itemsOriginal.map {
+                                    if (it is ReaderItem.Body) {
+                                        it.copy(textTranslated = memCachedTranslations[it.text] ?: it.text)
+                                    } else it
+                                }
+                            } else {
+                                // 2. Check database cache
+                                val dbTranslations = withContext(Dispatchers.IO) {
+                                    chapterTranslationDao.getTranslations(
+                                        chapterUrl = chapter.url,
+                                        sourceLang = sourceLang,
+                                        targetLang = targetLang
+                                    ).associate { it.originalText to it.translatedText }
+                                }
+                                
+                                if (dbTranslations.isNotEmpty()) {
+                                    android.util.Log.d("ReaderChaptersLoader", "Using DATABASE CACHE for chapter ${chapter.title} (${dbTranslations.size} translations)")
+                                    
+                                    itemsOriginal.map {
+                                        if (it is ReaderItem.Body) {
+                                            it.copy(textTranslated = dbTranslations[it.text] ?: it.text)
+                                        } else it
+                                    }
+                                } else {
+                                    // 3. Not cached anywhere - translate now and save to DB
+                                    val textsToTranslate = itemsOriginal.filterIsInstance<ReaderItem.Body>()
+                                        .map { it.text }
+                                    
+                                    android.util.Log.d("ReaderChaptersLoader", "Translating and caching ${textsToTranslate.size} paragraphs for chapter ${chapter.title}")
+                                    
+                                    if (textsToTranslate.isNotEmpty()) {
+                                        val translations = batchTranslator.invoke(textsToTranslate)
+                                        
+                                        // Save translations to database for future use
+                                        withContext(Dispatchers.IO) {
+                                            val translationEntities = translations.map { (original, translated) ->
+                                                ChapterTranslation(
+                                                    chapterUrl = chapter.url,
+                                                    sourceLang = sourceLang,
+                                                    targetLang = targetLang,
+                                                    originalText = original,
+                                                    translatedText = translated
+                                                )
+                                            }
+                                            chapterTranslationDao.insertReplace(translationEntities)
+                                            android.util.Log.d("ReaderChaptersLoader", "Saved ${translationEntities.size} translations to database")
+                                        }
+                                        
+                                        itemsOriginal.map {
+                                            if (it is ReaderItem.Body) {
+                                                it.copy(textTranslated = translations[it.text] ?: it.text)
+                                            } else it
+                                        }
+                                    } else {
+                                        itemsOriginal
+                                    }
+                                }
+                            }
+                        } else {
+                            // Fallback to paragraph-by-paragraph translation
+                            android.util.Log.d("ReaderChaptersLoader", "Using PARAGRAPH-BY-PARAGRAPH translation (batch translator not available)")
+                            itemsOriginal.map {
+                                if (it is ReaderItem.Body) {
+                                    it.copy(textTranslated = translatorTranslateOrNull(it.text))
+                                } else it
+                            }
+                        }
+                    }
+                    else -> itemsOriginal
+                }
+
+                withContext(Dispatchers.Main.immediate) {
+                    chaptersStats[chapter.url] = ChapterStats(
+                        chapter = chapter,
+                        itemsCount = items.size,
+                        orderedChaptersIndex = chapterIndex
+                    )
+                }
+
+                maintainPosition {
+                    remove(itemProgressBar)
+                    itemTranslating?.let {
+                        remove(it)
+                    }
+                    itemTranslationAttribution?.let {
+                        insert(it)
+                    }
+                    insertAll(items)
+                    insert(ReaderItem.Divider(chapterIndex = chapterIndex))
+                    readerViewHandlersActions.doForceUpdateListViewState()
+                }
+                withContext(Dispatchers.Main.immediate) {
+                    loadedChapters.add(chapter.url)
+                }
+            }
+            is Response.Error -> {
+                withContext(Dispatchers.Main.immediate) {
+                    chaptersStats[chapter.url] = ChapterStats(
+                        chapter = chapter,
+                        itemsCount = 1,
+                        orderedChaptersIndex = chapterIndex
+                    )
+                }
+                maintainPosition {
+                    remove(itemProgressBar)
+                    insert(ReaderItem.Error(chapterIndex = chapterIndex, text = res.message))
+                    readerViewHandlersActions.doForceUpdateListViewState()
+                }
+                withContext(Dispatchers.Main.immediate) {
+                    loadedChapters.add(chapter.url)
+                }
+            }
+        }
+    }
+}

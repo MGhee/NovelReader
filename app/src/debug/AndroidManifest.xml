@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name="my.novelreader.ui.DebugGoToReader"
+            android:exported="true" />
+        <activity
+            android:name="my.novelreader.ui.DebugGoToChapters"
+            android:exported="true" />
+    </application>
+</manifest>
