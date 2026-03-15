@@ -71,6 +71,8 @@ internal class SettingsViewModel @Inject constructor(
         geminiApiKey = appPreferences.TRANSLATION_GEMINI_API_KEY.state(viewModelScope),
         geminiModel = appPreferences.TRANSLATION_GEMINI_MODEL.state(viewModelScope),
         preferOnlineTranslation = appPreferences.TRANSLATION_PREFER_ONLINE.state(viewModelScope),
+        syncServerUrl = appPreferences.SYNC_SERVER_URL.state(viewModelScope),
+        syncApiKey = appPreferences.SYNC_API_KEY.state(viewModelScope),
     )
 
     init {
@@ -114,9 +116,14 @@ internal class SettingsViewModel @Inject constructor(
     }
 
     fun syncWithServer() {
-        val serverUrl = "http://192.168.1.104:3000"
-        toasty.show("Syncing with web app...")
-        workersInteractions.syncWithServer(serverUrl)
+        val serverUrl = appPreferences.SYNC_SERVER_URL.value
+        val apiKey = appPreferences.SYNC_API_KEY.value
+        toasty.show("Syncing with $serverUrl...")
+        workersInteractions.syncWithServer(serverUrl, apiKey)
+    }
+
+    fun onSyncServerUrlChange(url: String) {
+        appPreferences.SYNC_SERVER_URL.value = url
     }
 
     fun onFollowSystemChange(follow: Boolean) {
@@ -133,6 +140,10 @@ internal class SettingsViewModel @Inject constructor(
 
     fun onGeminiModelChange(model: String) {
         appPreferences.TRANSLATION_GEMINI_MODEL.value = model
+    }
+
+    fun onSyncApiKeyChange(apiKey: String) {
+        appPreferences.SYNC_API_KEY.value = apiKey
     }
 
     fun onPreferOnlineTranslationChange(prefer: Boolean) {

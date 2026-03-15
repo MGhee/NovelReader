@@ -51,6 +51,7 @@ internal fun SettingsScreenBody(
     onGeminiApiKeyChange: (String) -> Unit,
     onGeminiModelChange: (String) -> Unit,
     onPreferOnlineChange: (Boolean) -> Unit,
+    onSyncApiKeyChange: (String) -> Unit,
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
@@ -67,7 +68,9 @@ internal fun SettingsScreenBody(
             imagesFolderSize = state.imageFolderSize.value,
             onCleanDatabase = onCleanDatabase,
             onCleanImageFolder = onCleanImageFolder,
-            onSyncWithServer = onSyncWithServer
+            onSyncWithServer = onSyncWithServer,
+            syncApiKey = state.syncApiKey.value,
+            onSyncApiKeyChange = onSyncApiKeyChange
         )
         HorizontalDivider()
         SettingsBackup(
@@ -146,6 +149,8 @@ private fun Preview() {
                     geminiApiKey = remember { derivedStateOf { "" } },
                     geminiModel = remember { derivedStateOf { "" } },
                     preferOnlineTranslation = remember { derivedStateOf { false } },
+                        syncServerUrl = remember { derivedStateOf { "https://novelapp.viktorbarzin.me" } },
+                        syncApiKey = remember { derivedStateOf { "" } },
                 ),
                 onFollowSystem = { },
                 onThemeSelected = { },
@@ -160,6 +165,7 @@ private fun Preview() {
                 onGeminiApiKeyChange = { },
                 onGeminiModelChange = { },
                 onPreferOnlineChange = { },
+                onSyncApiKeyChange = { },
             )
         }
     }

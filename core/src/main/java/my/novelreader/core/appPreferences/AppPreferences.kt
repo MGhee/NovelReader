@@ -174,7 +174,8 @@ class AppPreferences @Inject constructor(
     // Sync preferences
     val SYNC_SERVER_URL =
         object : Preference<String>("SYNC_SERVER_URL") {
-            override var value by SharedPreference_String(name, preferences, "")
+            //override var value by SharedPreference_String(name, preferences, "https://novelapp.viktorbarzin.me")
+            override var value by SharedPreference_String(name, preferences, "http://192.168.1.104:3000")
         }
 
     val SYNC_ENABLED =
@@ -190,6 +191,11 @@ class AppPreferences @Inject constructor(
     val SYNC_LAST_TIMESTAMP =
         object : Preference<Long>("SYNC_LAST_TIMESTAMP") {
             override var value by SharedPreference_Long(name, preferences, 0L)
+        }
+
+    val SYNC_API_KEY =
+        object : Preference<String>("SYNC_API_KEY") {
+            override var value by SharedPreference_String(name, preferences, "")
         }
 
     @Deprecated("Removed", level = DeprecationLevel.HIDDEN)

@@ -16,6 +16,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.put
 import kotlinx.serialization.encodeToString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -57,15 +60,15 @@ class SyncRepository @Inject constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun fetchLibraryFromServer(serverUrl: String): Response<List<SyncBook>> =
+    suspend fun fetchLibraryFromServer(serverUrl: String, apiKey: String = ""): Response<List<SyncBook>> =
         withContext(Dispatchers.IO) {
             try {
                 val url = "$serverUrl/api/sync/library"
                 Timber.d("SyncRepository: fetching library from $url")
 
-                val request = Request.Builder()
-                    .url(url)
-                    .build()
+                val requestBuilder = Request.Builder().url(url)
+                if (apiKey.isNotBlank()) requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+                val request = requestBuilder.build()
 
                 val client = (networkClient as? ScraperNetworkClient)?.client
                 if (client == null) {
@@ -115,7 +118,7 @@ class SyncRepository @Inject constructor(
             }
         }
 
-    suspend fun pushLibraryToServer(serverUrl: String, localBooks: List<Book>): Response<SyncResponse> =
+    suspend fun pushLibraryToServer(serverUrl: String, localBooks: List<Book>, apiKey: String = ""): Response<SyncResponse> =
         withContext(Dispatchers.IO) {
             try {
                 // Convert local books to sync format
@@ -133,23 +136,59 @@ class SyncRepository @Inject constructor(
 
                     Timber.d("Sync: Book ${book.title} - lastReadChapter=${book.lastReadChapter}, total chapters: ${chapters.size}, current position: $currentChapterPosition")
 
+                    val chaptersData = chapters.map { chapter ->
+                        mapOf(
+                            "number" to (chapter.position + 1),
+                            "title" to (chapter.title ?: ""),
+                            "url" to chapter.url
+                        )
+                    }
+
                     mapOf(
                         "siteUrl" to book.url,
                         "title" to book.title,
                         "status" to if (book.completed) "COMPLETED" else "READING",
                         "currentChapter" to (currentChapterPosition + 1).toString(),
                         "totalChapters" to chapters.size.toString(),
+                        "chapters" to chaptersData,
+                        "coverUrl" to book.coverImageUrl,
+                        "description" to book.description,
                         "updatedAt" to System.currentTimeMillis().toString(),
                     )
                 }
 
-                val payload = mapOf("books" to syncBooks)
-                val jsonBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+                val jsonPayload = buildJsonObject {
+                    put("books", buildJsonArray {
+                        for (book in syncBooks) {
+                            add(buildJsonObject {
+                                put("siteUrl", book["siteUrl"] as String)
+                                put("title", book["title"] as String)
+                                put("status", book["status"] as String)
+                                put("currentChapter", book["currentChapter"] as String)
+                                put("totalChapters", book["totalChapters"] as String)
+                                put("coverUrl", book["coverUrl"] as? String ?: "")
+                                put("description", book["description"] as? String ?: "")
+                                put("updatedAt", book["updatedAt"] as String)
+                                put("chapters", buildJsonArray {
+                                    @Suppress("UNCHECKED_CAST")
+                                    val chapters = book["chapters"] as List<Map<String, Any>>
+                                    for (chapter in chapters) {
+                                        add(buildJsonObject {
+                                            put("number", (chapter["number"] as Int).toString())
+                                            put("title", chapter["title"] as String)
+                                            put("url", chapter["url"] as String)
+                                        })
+                                    }
+                                })
+                            })
+                        }
+                    })
+                }
+                val jsonBody = jsonPayload.toString().toRequestBody("application/json".toMediaType())
 
-                val request = Request.Builder()
-                    .url("$serverUrl/api/sync/push")
-                    .post(jsonBody)
-                    .build()
+                val requestBuilder = Request.Builder().url("$serverUrl/api/sync/push").post(jsonBody)
+                if (apiKey.isNotBlank()) requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+                val request = requestBuilder.build()
 
                 val client = (networkClient as? ScraperNetworkClient)?.client ?: return@withContext Response.Error("Invalid network client", Exception())
                 val response = client.newCall(request).execute()
@@ -171,14 +210,14 @@ class SyncRepository @Inject constructor(
     /**
      * Full sync: fetch server state, compare with local, merge conflicts (max chapter wins).
      */
-    suspend fun syncWithServer(serverUrl: String): Response<String> =
+    suspend fun syncWithServer(serverUrl: String, apiKey: String = ""): Response<String> =
         withContext(Dispatchers.IO) {
             try {
                 // 1. Get local library (only currently-reading books, exclude completed)
                 val localBooks = libraryBooksRepository.getAll().filter { it.inLibrary && !it.completed }
 
                 // 2. Fetch server state
-                val serverBooksResponse = fetchLibraryFromServer(serverUrl)
+                val serverBooksResponse = fetchLibraryFromServer(serverUrl, apiKey)
                 if (serverBooksResponse !is Response.Success) {
                     return@withContext Response.Error("Failed to fetch server state", Exception())
                 }
@@ -214,7 +253,7 @@ class SyncRepository @Inject constructor(
                 }
 
                 // 4. Push local books to server
-                val pushResponse = pushLibraryToServer(serverUrl, localBooks)
+                val pushResponse = pushLibraryToServer(serverUrl, localBooks, apiKey)
                 if (pushResponse !is Response.Success) {
                     return@withContext Response.Error("Failed to push to server", Exception())
                 }

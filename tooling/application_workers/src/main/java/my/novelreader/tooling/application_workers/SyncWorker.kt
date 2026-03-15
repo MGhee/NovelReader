@@ -31,9 +31,11 @@ internal class SyncWorker @AssistedInject constructor(
         const val TAG = "Sync"
         const val TAG_MANUAL = "SyncManual"
         private const val DATA_SERVER_URL = "serverUrl"
+        private const val DATA_API_KEY = "apiKey"
 
         fun createPeriodicRequest(
             serverUrl: String,
+            apiKey: String = "",
             repeatIntervalHours: Int = 24,
         ): PeriodicWorkRequest {
             val builder = PeriodicWorkRequestBuilder<SyncWorker>(
@@ -49,30 +51,32 @@ internal class SyncWorker @AssistedInject constructor(
                 .addTag(TAG)
                 .setConstraints(constraints)
                 .setInitialDelay(30, TimeUnit.MINUTES)
-                .setInputData(createInputData(serverUrl))
+                .setInputData(createInputData(serverUrl, apiKey))
                 .build()
         }
 
-        fun createManualRequest(serverUrl: String): OneTimeWorkRequest {
+        fun createManualRequest(serverUrl: String, apiKey: String = ""): OneTimeWorkRequest {
             return OneTimeWorkRequestBuilder<SyncWorker>()
                 .addTag(TAG_MANUAL)
-                .setInputData(createInputData(serverUrl))
+                .setInputData(createInputData(serverUrl, apiKey))
                 .build()
         }
 
-        private fun createInputData(serverUrl: String) = Data.Builder()
+        private fun createInputData(serverUrl: String, apiKey: String) = Data.Builder()
             .putString(DATA_SERVER_URL, serverUrl)
+            .putString(DATA_API_KEY, apiKey)
             .build()
     }
 
     override suspend fun doWork(): Result {
         val serverUrl = inputData.getString(DATA_SERVER_URL) ?: return Result.failure()
+        val apiKey = inputData.getString(DATA_API_KEY) ?: ""
 
         Timber.d("SyncWorker: starting sync with $serverUrl")
 
         return try {
             withContext(Dispatchers.IO) {
-                val result = syncRepository.syncWithServer(serverUrl)
+                val result = syncRepository.syncWithServer(serverUrl, apiKey)
 
                 when (result) {
                     is Response.Success -> {

@@ -19,6 +19,8 @@ data class SettingsScreenState(
     val geminiApiKey: State<String>,
     val geminiModel: State<String>,
     val preferOnlineTranslation: State<Boolean>,
+    val syncServerUrl: State<String>,
+    val syncApiKey: State<String>,
 ) {
     data class UpdateApp(
         val currentAppVersion: String,

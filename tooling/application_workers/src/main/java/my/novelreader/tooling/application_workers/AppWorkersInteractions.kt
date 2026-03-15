@@ -20,11 +20,11 @@ internal class AppWorkersInteractions @Inject constructor(
         ).enqueue()
     }
 
-    override fun syncWithServer(serverUrl: String) {
+    override fun syncWithServer(serverUrl: String, apiKey: String) {
         workManager.beginUniqueWork(
             SyncWorker.TAG_MANUAL,
             ExistingWorkPolicy.REPLACE,
-            SyncWorker.createManualRequest(serverUrl)
+            SyncWorker.createManualRequest(serverUrl, apiKey)
         ).enqueue()
     }
 }
