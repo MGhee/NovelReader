@@ -91,6 +91,40 @@ class AppPreferences @Inject constructor(
         override var value by SharedPreference_Boolean(name, preferences, true)
     }
 
+    val READER_TEXT_INDENT = object : Preference<Boolean>("READER_TEXT_INDENT") {
+        override var value by SharedPreference_Boolean(name, preferences, true)
+    }
+
+    val READER_PAGE_TURN_VOLUME_KEYS = object : Preference<Boolean>("READER_PAGE_TURN_VOLUME_KEYS") {
+        override var value by SharedPreference_Boolean(name, preferences, false)
+    }
+
+    val READER_PAGE_TURN_TAP_EDGE = object : Preference<Boolean>("READER_PAGE_TURN_TAP_EDGE") {
+        override var value by SharedPreference_Boolean(name, preferences, true)
+    }
+
+    val READER_MARGIN_LEVEL = object : Preference<ReaderMarginLevel>("READER_MARGIN_LEVEL") {
+        override var value by SharedPreference_Enum(name, preferences, ReaderMarginLevel.Small) {
+            enumValueOf(it)
+        }
+    }
+
+    val READER_LINE_SPACING_LEVEL = object : Preference<ReaderLineSpacingLevel>("READER_LINE_SPACING_LEVEL") {
+        override var value by SharedPreference_Enum(name, preferences, ReaderLineSpacingLevel.Small) {
+            enumValueOf(it)
+        }
+    }
+
+    val READER_LINE_BREAK_HEIGHT = object : Preference<Int>("READER_LINE_BREAK_HEIGHT") {
+        override var value by SharedPreference_Int(name, preferences, 20)
+    }
+
+    val READER_ORIENTATION = object : Preference<ReaderOrientation>("READER_ORIENTATION") {
+        override var value by SharedPreference_Enum(name, preferences, ReaderOrientation.Vertical) {
+            enumValueOf(it)
+        }
+    }
+
     val CHAPTERS_SORT_ASCENDING = object : Preference<TernaryState>("CHAPTERS_SORT_ASCENDING") {
         override var value by SharedPreference_Enum(
             name,

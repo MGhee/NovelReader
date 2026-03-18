@@ -3,20 +3,23 @@ package my.novelreader.features.reader.domain
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.text.Spanned
+import android.text.style.LeadingMarginSpan
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.doOnNextLayout
 import androidx.core.view.updateLayoutParams
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import my.novelreader.core.AppFileResolver
-import my.novelreader.core.utils.inflater
 import my.novelreader.features.reader.features.TextSynthesis
+import my.novelreader.features.reader.view.ReaderViewHolder
 import my.novelreader.reader.R
 import my.novelreader.reader.databinding.ActivityReaderListItemBodyBinding
 import my.novelreader.reader.databinding.ActivityReaderListItemDividerBinding
@@ -33,27 +36,39 @@ import my.novelreader.text_to_speech.Utterance
 
 internal class ReaderItemAdapter(
     private val ctx: Context,
-    list: List<ReaderItem>,
+    private val items: List<ReaderItem>,
     private val bookUrl: String,
     private val currentSpeakerActiveItem: () -> TextSynthesis,
     private val currentTextSelectability: () -> Boolean,
     private val currentFontSize: () -> Float,
     private val currentTypeface: () -> Typeface,
     private val currentTypefaceBold: () -> Typeface,
+    private val currentMarginDp: () -> Int = { 8 },
+    private val currentLineSpacingMultiplier: () -> Float = { 1.0f },
+    private val currentLineBreakHeight: () -> Int = { 0 },
+    private val currentTextIndent: () -> Boolean = { true },
     private val onChapterStartVisible: (chapterUrl: String) -> Unit,
     private val onChapterEndVisible: (chapterUrl: String) -> Unit,
     private val onReloadReader: () -> Unit,
     private val onClick: () -> Unit,
-) : ArrayAdapter<ReaderItem>(ctx, 0, list) {
+) : RecyclerView.Adapter<ReaderViewHolder>() {
+
     private val appFileResolver = AppFileResolver(ctx)
-    override fun getCount() = super.getCount() + 2
-    override fun getItem(position: Int): ReaderItem = when (position) {
+    private val inflater = LayoutInflater.from(ctx)
+
+    private fun dpToPx(dp: Int): Int = (dp * ctx.resources.displayMetrics.density).toInt()
+
+    override fun getItemCount() = items.size + 2  // top and bottom padding
+
+    fun getItem(position: Int): ReaderItem = when (position) {
         0 -> topPadding
         count - 1 -> bottomPadding
-        else -> super.getItem(position - 1)!!
+        else -> items[position - 1]
     }
 
-    // Ignores paddings as items that are visible
+    val count get() = itemCount
+
+    // Helpers for position mapping
     fun getFirstVisibleItemIndexGivenPosition(firstVisiblePosition: Int): Int =
         when (firstVisiblePosition) {
             in 1 until (count - 1) -> firstVisiblePosition - 1
@@ -62,21 +77,19 @@ internal class ReaderItemAdapter(
             else -> -1
         }
 
-    // Get list index from current position
     fun fromPositionToIndex(position: Int): Int = when (position) {
         in 1 until (count - 1) -> position - 1
         else -> -1
     }
 
-    fun fromIndexToPosition(index: ItemIndex): Int = when (index) {
-        in 0 until super.getCount() -> index + 1
+    fun fromIndexToPosition(index: Int): Int = when (index) {
+        in 0 until items.size -> index + 1
         else -> -1
     }
 
     private val topPadding = ReaderItem.Padding(chapterIndex = Int.MIN_VALUE)
     private val bottomPadding = ReaderItem.Padding(chapterIndex = Int.MAX_VALUE)
 
-    override fun getViewTypeCount(): Int = 12
     override fun getItemViewType(position: Int) = when (getItem(position)) {
         is ReaderItem.Body -> 0
         is ReaderItem.Image -> 1
@@ -92,91 +105,116 @@ internal class ReaderItemAdapter(
         is ReaderItem.TranslateAttribution -> 11
     }
 
-    private fun viewTranslateAttribution(
-        convertView: View?,
-        parent: ViewGroup
-    ): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemGoogleTranslateAttributionBinding.inflate(
-                parent.inflater,
-                parent,
-                false
-            ).also { it.root.tag = it }
-            else -> ActivityReaderListItemGoogleTranslateAttributionBinding.bind(convertView)
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ReaderViewHolder {
+        return when (viewType) {
+            0 -> ReaderViewHolder.BodyHolder(
+                ActivityReaderListItemBodyBinding.inflate(inflater, parent, false)
+            )
+            1 -> ReaderViewHolder.ImageHolder(
+                ActivityReaderListItemImageBinding.inflate(inflater, parent, false)
+            )
+            2 -> ReaderViewHolder.BookEndHolder(
+                ActivityReaderListItemSpecialTitleBinding.inflate(inflater, parent, false)
+            )
+            3 -> ReaderViewHolder.BookStartHolder(
+                ActivityReaderListItemSpecialTitleBinding.inflate(inflater, parent, false)
+            )
+            4 -> ReaderViewHolder.DividerHolder(
+                ActivityReaderListItemDividerBinding.inflate(inflater, parent, false)
+            )
+            5 -> ReaderViewHolder.ErrorHolder(
+                ActivityReaderListItemErrorBinding.inflate(inflater, parent, false)
+            )
+            6 -> ReaderViewHolder.PaddingHolder(
+                ActivityReaderListItemPaddingBinding.inflate(inflater, parent, false)
+            )
+            7 -> ReaderViewHolder.ProgressbarHolder(
+                ActivityReaderListItemProgressBarBinding.inflate(inflater, parent, false)
+            )
+            8 -> ReaderViewHolder.TitleHolder(
+                ActivityReaderListItemTitleBinding.inflate(inflater, parent, false)
+            )
+            9 -> ReaderViewHolder.TranslatingHolder(
+                ActivityReaderListItemTranslatingBinding.inflate(inflater, parent, false)
+            )
+            10 -> ReaderViewHolder.GoogleTranslateAttributionHolder(
+                ActivityReaderListItemGoogleTranslateAttributionBinding.inflate(inflater, parent, false)
+            )
+            11 -> ReaderViewHolder.TranslateAttributionHolder(
+                ActivityReaderListItemTranslateAttributionBinding.inflate(inflater, parent, false)
+            )
+            else -> throw IllegalArgumentException("Unknown view type: $viewType")
         }
-        return bind.root
     }
 
-    private fun viewTranslateAttributionNew(
-        item: ReaderItem.TranslateAttribution,
-        convertView: View?,
-        parent: ViewGroup
-    ): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemTranslateAttributionBinding.inflate(
-                parent.inflater,
-                parent,
-                false
-            ).also { it.root.tag = it }
-            else -> ActivityReaderListItemTranslateAttributionBinding.bind(convertView)
+    override fun onBindViewHolder(holder: ReaderViewHolder, position: Int) {
+        val item = getItem(position)
+        when (holder) {
+            is ReaderViewHolder.BodyHolder -> bindBody(holder, item as ReaderItem.Body)
+            is ReaderViewHolder.TitleHolder -> bindTitle(holder, item as ReaderItem.Title)
+            is ReaderViewHolder.ImageHolder -> bindImage(holder, item as ReaderItem.Image)
+            is ReaderViewHolder.DividerHolder -> {} // No binding needed
+            is ReaderViewHolder.PaddingHolder -> bindPadding(holder, item as ReaderItem.Padding)
+            is ReaderViewHolder.ProgressbarHolder -> {} // No binding needed
+            is ReaderViewHolder.ErrorHolder -> bindError(holder, item as ReaderItem.Error)
+            is ReaderViewHolder.BookEndHolder -> bindBookEnd(holder)
+            is ReaderViewHolder.BookStartHolder -> bindBookStart(holder)
+            is ReaderViewHolder.TranslatingHolder -> bindTranslating(holder, item as ReaderItem.Translating)
+            is ReaderViewHolder.TranslateAttributionHolder -> bindTranslateAttribution(holder, item as ReaderItem.TranslateAttribution)
+            is ReaderViewHolder.GoogleTranslateAttributionHolder -> {} // No binding needed
         }
-        
-        // Set text based on provider
-        bind.attributionText.text = when (item.provider) {
-            "gemini" -> "Powered by Gemini"
-            else -> "Powered by Google Translate"
-        }
-        
-        return bind.root
     }
 
-    private fun viewBody(item: ReaderItem.Body, convertView: View?, parent: ViewGroup): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemBodyBinding.inflate(parent.inflater, parent, false)
-                .also { it.root.tag = it }
-            else -> ActivityReaderListItemBodyBinding.bind(convertView)
-        }
-
+    private fun bindBody(holder: ReaderViewHolder.BodyHolder, item: ReaderItem.Body) {
+        val bind = holder.binding
         bind.body.updateTextSelectability()
         bind.root.background = getItemReadingStateBackground(item)
-        val paragraph = item.textToDisplay + "\n"
-        bind.body.text = paragraph
+
+        val marginPx = dpToPx(currentMarginDp())
+        val spacingDp = maxOf(0, (currentLineBreakHeight() - 10) * 2 - 5)
+        val spacingPx = dpToPx(spacingDp)
+
+        bind.body.setPadding(marginPx, bind.body.paddingTop, marginPx, spacingPx)
+
+        val paragraph = item.textToDisplay
+        if (currentTextIndent()) {
+            val spanned = android.text.SpannableString(paragraph)
+            val indentPx = dpToPx(16)
+            spanned.setSpan(LeadingMarginSpan.Standard(indentPx, 0), 0, spanned.length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            bind.body.text = spanned
+        } else {
+            bind.body.text = paragraph
+        }
+
         bind.body.textSize = currentFontSize()
         bind.body.typeface = currentTypeface()
+        bind.body.setLineSpacing(0f, currentLineSpacingMultiplier())
 
         when (item.location) {
             ReaderItem.Location.FIRST -> onChapterStartVisible(item.chapterUrl)
             ReaderItem.Location.LAST -> onChapterEndVisible(item.chapterUrl)
-            else -> run {}
+            else -> {}
         }
-        return bind.root
     }
 
-    private fun viewImage(
-        item: ReaderItem.Image,
-        convertView: View?,
-        parent: ViewGroup
-    ): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemImageBinding.inflate(parent.inflater, parent, false)
-                .also { it.root.tag = it }
-            else -> ActivityReaderListItemImageBinding.bind(convertView)
-        }
+    private fun bindTitle(holder: ReaderViewHolder.TitleHolder, item: ReaderItem.Title) {
+        val bind = holder.binding
+        bind.title.updateTextSelectability()
+        bind.root.background = getItemReadingStateBackground(item)
+        bind.title.text = item.textToDisplay
+        bind.title.typeface = currentTypefaceBold()
 
+        val marginPx = dpToPx(currentMarginDp())
+        bind.title.setPadding(marginPx, bind.title.paddingTop, marginPx, bind.title.paddingBottom)
+    }
+
+    private fun bindImage(holder: ReaderViewHolder.ImageHolder, item: ReaderItem.Image) {
+        val bind = holder.binding
         bind.image.updateLayoutParams<ConstraintLayout.LayoutParams> {
             dimensionRatio = "1:${item.image.yrel}"
         }
 
-        val imageModel = appFileResolver.resolvedBookImagePath(
-            bookUrl = bookUrl,
-            imagePath = item.image.path
-        )
-
-        // Glide uses current imageView size to load the bitmap best optimized for it, but current
-        // size corresponds to the last image (different size) and the view layout only updates to
-        // the new values on next redraw. Execute Glide loading call in the next (parent) layout
-        // update to let it get the correct values.
-        // (Avoids getting "blurry" images)
+        val imageModel = appFileResolver.resolvedBookImagePath(bookUrl = bookUrl, imagePath = item.image.path)
         bind.imageContainer.doOnNextLayout {
             Glide.with(ctx)
                 .load(imageModel)
@@ -189,138 +227,70 @@ internal class ReaderItemAdapter(
         when (item.location) {
             ReaderItem.Location.FIRST -> onChapterStartVisible(item.chapterUrl)
             ReaderItem.Location.LAST -> onChapterEndVisible(item.chapterUrl)
-            else -> run {}
+            else -> {}
         }
-
-        return bind.root
     }
 
-    private fun viewBookEnd(
-        convertView: View?,
-        parent: ViewGroup
-    ): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemSpecialTitleBinding.inflate(
-                parent.inflater,
-                parent,
-                false
-            ).also { it.root.tag = it }
-            else -> ActivityReaderListItemSpecialTitleBinding.bind(convertView)
-        }
+    private fun bindPadding(holder: ReaderViewHolder.PaddingHolder, item: ReaderItem.Padding) {
+        val bind = holder.binding
+        val spacingDp = maxOf(0, (currentLineBreakHeight() - 10) * 2 - 5)
+        val lineBreakHeightPx = dpToPx(spacingDp)
 
+        if (lineBreakHeightPx <= 0) {
+            bind.root.visibility = View.GONE
+        } else {
+            bind.root.visibility = View.VISIBLE
+            bind.root.updateLayoutParams {
+                height = lineBreakHeightPx
+            }
+        }
+        bind.root.setPadding(0, 0, 0, 0)
+    }
+
+    private fun bindError(holder: ReaderViewHolder.ErrorHolder, item: ReaderItem.Error) {
+        val bind = holder.binding
+        bind.error.updateTextSelectability()
+        bind.reloadButton.setOnClickListener { onReloadReader() }
+        bind.error.text = item.text
+    }
+
+    private fun bindBookEnd(holder: ReaderViewHolder.BookEndHolder) {
+        val bind = holder.binding
         bind.specialTitle.updateTextSelectability()
         bind.specialTitle.text = ctx.getString(R.string.reader_no_more_chapters)
         bind.specialTitle.typeface = currentTypefaceBold()
-        return bind.root
     }
 
-    private fun viewBookStart(
-        convertView: View?,
-        parent: ViewGroup
-    ): View {
-        val bind = when (convertView) {
-
-            null -> ActivityReaderListItemSpecialTitleBinding.inflate(
-                parent.inflater,
-                parent,
-                false
-            ).also { it.root.tag = it }
-            else -> ActivityReaderListItemSpecialTitleBinding.bind(convertView)
-        }
-
+    private fun bindBookStart(holder: ReaderViewHolder.BookStartHolder) {
+        val bind = holder.binding
         bind.specialTitle.updateTextSelectability()
         bind.specialTitle.text = ctx.getString(R.string.reader_first_chapter)
         bind.specialTitle.typeface = currentTypefaceBold()
-        return bind.root
     }
 
-    private fun viewProgressbar(
-        convertView: View?,
-        parent: ViewGroup
-    ): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemProgressBarBinding.inflate(parent.inflater, parent, false)
-                .also { it.root.tag = it }
-            else -> ActivityReaderListItemProgressBarBinding.bind(convertView)
-        }
-        return bind.root
-    }
-
-    private fun viewTranslating(
-        item: ReaderItem.Translating,
-        convertView: View?,
-        parent: ViewGroup
-    ): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemTranslatingBinding.inflate(parent.inflater, parent, false)
-                .also { it.root.tag = it }
-            else -> ActivityReaderListItemTranslatingBinding.bind(convertView)
-        }
-        bind.text.text = context.getString(
+    private fun bindTranslating(holder: ReaderViewHolder.TranslatingHolder, item: ReaderItem.Translating) {
+        val bind = holder.binding
+        bind.text.text = ctx.getString(
             R.string.translating_from_lang_a_to_lang_b,
             item.sourceLang,
             item.targetLang
         )
-        return bind.root
     }
 
-    private fun viewDivider(convertView: View?, parent: ViewGroup): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemDividerBinding.inflate(parent.inflater, parent, false)
-                .also { it.root.tag = it }
-            else -> ActivityReaderListItemDividerBinding.bind(convertView)
+    private fun bindTranslateAttribution(holder: ReaderViewHolder.TranslateAttributionHolder, item: ReaderItem.TranslateAttribution) {
+        val bind = holder.binding
+        bind.attributionText.text = when (item.provider) {
+            "gemini" -> "Powered by Gemini"
+            else -> "Powered by Google Translate"
         }
-        return bind.root
-    }
-
-    private fun viewError(item: ReaderItem.Error, convertView: View?, parent: ViewGroup): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemErrorBinding.inflate(parent.inflater, parent, false)
-                .also { it.root.tag = it }
-            else -> ActivityReaderListItemErrorBinding.bind(convertView)
-        }
-
-        bind.error.updateTextSelectability()
-        bind.reloadButton.setOnClickListener { onReloadReader() }
-        bind.error.text = item.text
-        return bind.root
-    }
-
-    private fun viewPadding(convertView: View?, parent: ViewGroup): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemPaddingBinding.inflate(parent.inflater, parent, false)
-                .also { it.root.tag = it }
-            else -> ActivityReaderListItemPaddingBinding.bind(convertView)
-        }
-        return bind.root
-    }
-
-    private fun viewTitle(item: ReaderItem.Title, convertView: View?, parent: ViewGroup): View {
-        val bind = when (convertView) {
-            null -> ActivityReaderListItemTitleBinding.inflate(parent.inflater, parent, false)
-                .also { it.root.tag = it }
-            else -> ActivityReaderListItemTitleBinding.bind(convertView)
-        }
-
-        bind.title.updateTextSelectability()
-        bind.root.background = getItemReadingStateBackground(item)
-        bind.title.text = item.textToDisplay
-        bind.title.typeface = currentTypefaceBold()
-        return bind.root
     }
 
     private val currentReadingAloudDrawable by lazy {
-        AppCompatResources.getDrawable(
-            context,
-            R.drawable.translucent_current_reading_text_background
-        )
+        AppCompatResources.getDrawable(ctx, R.drawable.translucent_current_reading_text_background)
     }
 
     private val currentReadingAloudLoadingDrawable by lazy {
-        AppCompatResources.getDrawable(
-            context,
-            R.drawable.translucent_current_reading_loading_text_background
-        )
+        AppCompatResources.getDrawable(ctx, R.drawable.translucent_current_reading_loading_text_background)
     }
 
     private fun TextView.updateTextSelectability() {
@@ -345,29 +315,6 @@ internal class ReaderItemAdapter(
             Utterance.PlayState.FINISHED -> null
         }
     }
-
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
-        when (val item = getItem(position)) {
-            is ReaderItem.GoogleTranslateAttribution -> viewTranslateAttribution(
-                convertView,
-                parent
-            )
-            is ReaderItem.TranslateAttribution -> viewTranslateAttributionNew(
-                item,
-                convertView,
-                parent
-            )
-            is ReaderItem.Body -> viewBody(item, convertView, parent)
-            is ReaderItem.Image -> viewImage(item, convertView, parent)
-            is ReaderItem.BookEnd -> viewBookEnd(convertView, parent)
-            is ReaderItem.BookStart -> viewBookStart(convertView, parent)
-            is ReaderItem.Divider -> viewDivider(convertView, parent)
-            is ReaderItem.Error -> viewError(item, convertView, parent)
-            is ReaderItem.Padding -> viewPadding(convertView, parent)
-            is ReaderItem.Progressbar -> viewProgressbar(convertView, parent)
-            is ReaderItem.Translating -> viewTranslating(item, convertView, parent)
-            is ReaderItem.Title -> viewTitle(item, convertView, parent)
-        }
 
     private fun View.setTextSelectionAwareClick(action: () -> Unit) {
         setOnClickListener { action() }

@@ -27,4 +27,12 @@ internal class AppWorkersInteractions @Inject constructor(
             SyncWorker.createManualRequest(serverUrl, apiKey)
         ).enqueue()
     }
+
+    override fun downloadAllBookChapters(bookUrl: String) {
+        workManager.beginUniqueWork(
+            "ChapterDownload_$bookUrl",
+            ExistingWorkPolicy.REPLACE,
+            ChapterDownloadWorker.createRequest(bookUrl)
+        ).enqueue()
+    }
 }

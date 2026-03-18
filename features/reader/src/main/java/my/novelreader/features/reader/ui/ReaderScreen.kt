@@ -9,24 +9,40 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.displayCutoutPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.outlined.ColorLens
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -35,24 +51,32 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
+import my.novelreader.core.appPreferences.ReaderLineSpacingLevel
+import my.novelreader.core.appPreferences.ReaderMarginLevel
+import my.novelreader.core.appPreferences.ReaderOrientation
 import my.novelreader.coreui.theme.InternalTheme
 import my.novelreader.coreui.theme.Themes
 import my.novelreader.coreui.theme.colorApp
@@ -75,23 +99,58 @@ internal fun ReaderScreen(
     onKeepScreenOn: (Boolean) -> Unit,
     onFollowSystem: (Boolean) -> Unit,
     onFullScreen: (Boolean) -> Unit,
+    onOrientationChange: (ReaderOrientation) -> Unit,
     onThemeSelected: (Themes) -> Unit,
     onTextFontChanged: (String) -> Unit,
     onTextSizeChanged: (Float) -> Unit,
+    onTextIndentChange: (Boolean) -> Unit,
+    onMarginLevelChange: (ReaderMarginLevel) -> Unit,
+    onLineSpacingLevelChange: (ReaderLineSpacingLevel) -> Unit,
+    onLineBreakHeightChange: (Int) -> Unit,
     onPressBack: () -> Unit,
     onOpenChapterInWeb: () -> Unit,
+    onOpenChapter: (chapterUrl: String) -> Unit,
+    onDownloadChapter: (chapterUrl: String) -> Unit,
+    onNavigateToNextChapter: () -> Unit = {},
+    onNavigateToPreviousChapter: () -> Unit = {},
+    onOpenChaptersList: () -> Unit = {},
+    onDownloadAllChapters: () -> Unit = {},
+    onDeleteAllChapters: () -> Unit = {},
     readerContent: @Composable (paddingValues: PaddingValues) -> Unit,
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    // Track full screen state for restoration
+    val wasFullScreenBeforeChapterList = remember { mutableStateOf(false) }
+
     // Capture back action when viewing info
     BackHandler(enabled = state.showReaderInfo.value) {
         state.showReaderInfo.value = false
+    }
+
+    BackHandler(enabled = state.showChapterList.value) {
+        state.showChapterList.value = false
+        state.showReaderInfo.value = false
+        // Restore full screen if it was enabled before chapter list opened
+        if (wasFullScreenBeforeChapterList.value && !state.settings.fullScreen.value) {
+            onFullScreen(true)
+        }
+    }
+
+    // Exit full screen when chapter list opens
+    LaunchedEffect(state.showChapterList.value) {
+        if (state.showChapterList.value) {
+            wasFullScreenBeforeChapterList.value = state.settings.fullScreen.value
+            if (state.settings.fullScreen.value) {
+                onFullScreen(false)
+            }
+        }
     }
 
     Scaffold(
         topBar = {
             val fullScreen by rememberUpdatedState(state.showReaderInfo.value)
             AnimatedVisibility(
-                visible = state.showReaderInfo.value,
+                visible = state.showReaderInfo.value && !state.showChapterList.value,
                 enter = expandVertically(initialHeight = { 0 }, expandFrom = Alignment.Top)
                         + fadeIn(),
                 exit = shrinkVertically(targetHeight = { 0 }, shrinkTowards = Alignment.Top)
@@ -113,52 +172,84 @@ internal fun ReaderScreen(
                                 scrolledContainerColor = MaterialTheme.colorApp.tintedSurface,
                             ),
                             title = {
-                                Text(
-                                    text = state.readerInfo.chapterTitle.value,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.animateContentSize()
-                                )
+                                Column(
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = state.readerInfo.bookTitle.value,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = state.readerInfo.chapterTitle.value,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.animateContentSize()
+                                    )
+                                }
                             },
                             navigationIcon = {
                                 IconButton(onClick = onPressBack) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                                    Icon(Icons.Filled.Close, null)
                                 }
                             },
                             actions = {
-                                IconButton(onClick = onOpenChapterInWeb) {
-                                    Icon(Icons.Filled.Public, null)
+                                val showMenu = remember { mutableStateOf(false) }
+                                IconButton(onClick = { showMenu.value = true }) {
+                                    Icon(Icons.Filled.MoreVert, null)
+                                }
+                                DropdownMenu(
+                                    expanded = showMenu.value,
+                                    onDismissRequest = { showMenu.value = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(id = R.string.open_in_browser)) },
+                                        onClick = {
+                                            onOpenChapterInWeb()
+                                            showMenu.value = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(id = R.string.allow_text_selection)) },
+                                        onClick = {
+                                            onSelectableTextChange(!state.settings.isTextSelectable.value)
+                                            showMenu.value = false
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                if (state.settings.isTextSelectable.value) Icons.Filled.Check else Icons.Filled.Close,
+                                                null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(id = R.string.features_reader_full_screen)) },
+                                        onClick = {
+                                            onFullScreen(!state.settings.fullScreen.value)
+                                            showMenu.value = false
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                if (state.settings.fullScreen.value) Icons.Filled.Check else Icons.Filled.Close,
+                                                null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    )
                                 }
                             }
                         )
-                        Column(
-                            modifier = Modifier
-                                .padding(bottom = 8.dp)
-                                .padding(horizontal = 16.dp),
-                        ) {
-                            Text(
-                                text = stringResource(
-                                    id = R.string.chapter_x_over_n,
-                                    state.readerInfo.chapterCurrentNumber.value,
-                                    state.readerInfo.chaptersCount.value,
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                            Text(
-                                text = stringResource(
-                                    id = R.string.progress_x_percentage,
-                                    state.readerInfo.chapterPercentageProgress.value
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        }
-                        HorizontalDivider()
                     }
                 }
             }
         },
-        content = readerContent,
+        content = { innerPadding ->
+            readerContent(innerPadding)
+        },
         bottomBar = {
 
             val toggleOrSet = { type: Type ->
@@ -168,7 +259,7 @@ internal fun ReaderScreen(
                 }
             }
             AnimatedVisibility(
-                visible = state.showReaderInfo.value,
+                visible = state.showReaderInfo.value && !state.showChapterList.value,
                 enter = expandVertically(initialHeight = { 0 }) + fadeIn(),
                 exit = shrinkVertically(targetHeight = { 0 }) + fadeOut(),
             ) {
@@ -182,6 +273,19 @@ internal fun ReaderScreen(
                         onThemeSelected = onThemeSelected,
                         onKeepScreenOn = onKeepScreenOn,
                         onFullScreen = onFullScreen,
+                        onOrientationChange = onOrientationChange,
+                        onTextIndentChange = onTextIndentChange,
+                        onMarginLevelChange = onMarginLevelChange,
+                        onLineSpacingLevelChange = onLineSpacingLevelChange,
+                        onLineBreakHeightChange = onLineBreakHeightChange,
+                        onOpenChaptersList = {
+                            state.settings.selectedSetting.value = Type.None
+                            state.showChapterList.value = true
+                        },
+                        onCloseStyleDialog = {
+                            state.settings.selectedSetting.value = Type.None
+                            state.showReaderInfo.value = false
+                        },
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     BottomAppBar(
@@ -189,40 +293,123 @@ internal fun ReaderScreen(
                             .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                             .animateContentSize(),
                         containerColor = MaterialTheme.colorApp.tintedSurface,
+                        contentPadding = PaddingValues(0.dp),
                     ) {
-                        if (state.settings.liveTranslation.isAvailable) SettingIconItem(
-                            currentType = state.settings.selectedSetting.value,
-                            settingType = Type.LiveTranslation,
-                            onClick = toggleOrSet,
-                            icon = Icons.Outlined.Translate,
-                            textId = R.string.translator,
-                        )
-                        SettingIconItem(
-                            currentType = state.settings.selectedSetting.value,
-                            settingType = Type.TextToSpeech,
-                            onClick = toggleOrSet,
-                            icon = Icons.Filled.RecordVoiceOver,
-                            textId = R.string.voice_reader,
-                        )
-                        SettingIconItem(
-                            currentType = state.settings.selectedSetting.value,
-                            settingType = Type.Style,
-                            onClick = toggleOrSet,
-                            icon = Icons.Outlined.ColorLens,
-                            textId = R.string.style,
-                        )
-                        SettingIconItem(
-                            currentType = state.settings.selectedSetting.value,
-                            settingType = Type.More,
-                            onClick = toggleOrSet,
-                            icon = Icons.Outlined.MoreHoriz,
-                            textId = R.string.more,
-                        )
+                        // Previous Chapter
+                        IconButton(
+                            onClick = onNavigateToPreviousChapter,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.previous_chapter))
+                        }
+
+                        // Chapters List
+                        IconButton(
+                            onClick = onOpenChaptersList,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.CloudDownload, contentDescription = stringResource(R.string.chapter_list))
+                        }
+
+                        // Style Settings
+                        IconButton(
+                            onClick = { toggleOrSet(Type.Style) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Outlined.ColorLens, contentDescription = stringResource(R.string.style))
+                        }
+
+                        // Text to Speech
+                        IconButton(
+                            onClick = { toggleOrSet(Type.TextToSpeech) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.RecordVoiceOver, contentDescription = stringResource(R.string.voice_reader))
+                        }
+
+                        // Live Translation or More
+                        if (state.settings.liveTranslation.isAvailable) {
+                            IconButton(
+                                onClick = { toggleOrSet(Type.LiveTranslation) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Outlined.Translate, contentDescription = stringResource(R.string.translator))
+                            }
+                        } else {
+                            IconButton(
+                                onClick = { toggleOrSet(Type.More) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Outlined.MoreHoriz, contentDescription = stringResource(R.string.more))
+                            }
+                        }
+
+                        // Next Chapter
+                        IconButton(
+                            onClick = onNavigateToNextChapter,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.next_chapter), modifier = Modifier.rotate(180f))
+                        }
                     }
                 }
             }
         }
     )
+
+    // Chapter List Overlay
+    if (state.showChapterList.value) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Dimming background - clickable to close
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable {
+                        state.showChapterList.value = false
+                        state.showReaderInfo.value = false
+                        // Restore full screen if it was enabled before
+                        if (wasFullScreenBeforeChapterList.value && !state.settings.fullScreen.value) {
+                            onFullScreen(true)
+                        }
+                    }
+            )
+
+            // Chapter List Panel - 75% width on the left
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.75f)
+                    .align(Alignment.TopStart)
+            ) {
+                ReaderChapterListScreen(
+                    chapters = state.readerInfo.chapters.value,
+                    currentChapterUrl = state.readerInfo.chapterUrl.value,
+                    onChapterClick = { chapter ->
+                        onOpenChapter(chapter.chapter.url)
+                        state.showChapterList.value = false
+                        state.showReaderInfo.value = false
+                        // Restore full screen if it was enabled before
+                        if (wasFullScreenBeforeChapterList.value && !state.settings.fullScreen.value) {
+                            onFullScreen(true)
+                        }
+                    },
+                    onDownloadAllClick = onDownloadAllChapters,
+                    onDeleteAllClick = onDeleteAllChapters,
+                    onBackClick = {
+                        state.showChapterList.value = false
+                        state.showReaderInfo.value = false
+                        // Restore full screen if it was enabled before
+                        if (wasFullScreenBeforeChapterList.value && !state.settings.fullScreen.value) {
+                            onFullScreen(true)
+                        }
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -328,6 +515,14 @@ private fun ViewsPreview(
         currentTheme = remember { mutableStateOf(Themes.DARK) },
         textFont = remember { mutableStateOf("Arial") },
         textSize = remember { mutableFloatStateOf(20f) },
+        textIndent = remember { mutableStateOf(true) },
+        pageTurnVolumeKeys = remember { mutableStateOf(false) },
+        pageTurnTapEdge = remember { mutableStateOf(true) },
+        marginLevel = remember { mutableStateOf(ReaderMarginLevel.Small) },
+        lineSpacingLevel = remember { mutableStateOf(ReaderLineSpacingLevel.Small) },
+        lineBreakHeight = remember { mutableIntStateOf(20) },
+        orientation = remember { mutableStateOf(ReaderOrientation.Vertical) },
+        keepScreenOn = remember { mutableStateOf(false) },
     )
 
     InternalTheme {
@@ -336,18 +531,32 @@ private fun ViewsPreview(
                 state = ReaderScreenState(
                     showReaderInfo = remember { mutableStateOf(true) },
                     readerInfo = ReaderScreenState.CurrentInfo(
+                        bookTitle = remember { mutableStateOf("Book Title") },
                         chapterTitle = remember { mutableStateOf("Chapter title") },
                         chapterCurrentNumber = remember { mutableIntStateOf(2) },
                         chapterPercentageProgress = remember { mutableFloatStateOf(0.5f) },
                         chaptersCount = remember { mutableIntStateOf(255) },
                         chapterUrl = remember { mutableStateOf("Chapter url") },
+                        chapters = remember { mutableStateOf(listOf()) },
                     ),
                     settings = ReaderScreenState.Settings(
                         isTextSelectable = remember { mutableStateOf(false) },
-                        keepScreenOn = remember { mutableStateOf(false) },
                         textToSpeech = textToSpeechSettingData,
                         liveTranslation = liveTranslationSettingData,
-                        style = style,
+                        style = ReaderScreenState.Settings.StyleSettingsData(
+                            followSystem = remember { mutableStateOf(true) },
+                            currentTheme = remember { mutableStateOf(Themes.DARK) },
+                            textFont = remember { mutableStateOf("Arial") },
+                            textSize = remember { mutableFloatStateOf(20f) },
+                            textIndent = remember { mutableStateOf(true) },
+                            pageTurnVolumeKeys = remember { mutableStateOf(false) },
+                            pageTurnTapEdge = remember { mutableStateOf(true) },
+                            marginLevel = remember { mutableStateOf(ReaderMarginLevel.Small) },
+                            lineSpacingLevel = remember { mutableStateOf(ReaderLineSpacingLevel.Small) },
+                            lineBreakHeight = remember { mutableIntStateOf(20) },
+                            orientation = remember { mutableStateOf(ReaderOrientation.Vertical) },
+                            keepScreenOn = remember { mutableStateOf(false) },
+                        ),
                         selectedSetting = remember { mutableStateOf(data.selectedSetting) },
                         fullScreen = remember { mutableStateOf(false) },
                     ),
@@ -358,11 +567,18 @@ private fun ViewsPreview(
                 onSelectableTextChange = {},
                 onFollowSystem = {},
                 onThemeSelected = {},
+                onTextIndentChange = {},
+                onMarginLevelChange = {},
+                onLineSpacingLevelChange = {},
+                onLineBreakHeightChange = {},
                 onPressBack = {},
                 onOpenChapterInWeb = {},
+                onOpenChapter = {},
+                onDownloadChapter = {},
                 readerContent = {},
                 onKeepScreenOn = {},
                 onFullScreen = {},
+                onOrientationChange = {}
             )
         }
     }

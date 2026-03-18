@@ -15,6 +15,9 @@ import my.novelreader.coreui.mappers.toTheme
 import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.core.utils.StateExtra_Boolean
 import my.novelreader.core.utils.StateExtra_String
+import my.novelreader.core.utils.toState
+import my.novelreader.data.AppRepository
+import my.novelreader.features.reader.domain.ChapterState
 import my.novelreader.features.reader.manager.ReaderManager
 import my.novelreader.features.reader.ui.ReaderScreenState
 import my.novelreader.features.reader.ui.ReaderViewHandlersActions
@@ -31,6 +34,7 @@ interface ReaderStateBundle {
 internal class ReaderViewModel @Inject constructor(
     stateHandler: SavedStateHandle,
     appPreferences: AppPreferences,
+    private val appRepository: AppRepository,
     private val readerManager: ReaderManager,
     readerViewHandlersActions: ReaderViewHandlersActions,
 ) : BaseViewModel(), ReaderStateBundle {
@@ -46,10 +50,16 @@ internal class ReaderViewModel @Inject constructor(
 
     private val readingPosStats = readerSession.readingStats
     private val themeId = appPreferences.THEME_ID.state(viewModelScope)
+    private val chaptersInBook = appRepository.bookChapters
+        .getChaptersWithContextFlow(bookUrl)
+        .toState(viewModelScope, listOf())
 
     val state = ReaderScreenState(
         showReaderInfo = mutableStateOf(false),
         readerInfo = ReaderScreenState.CurrentInfo(
+            bookTitle = derivedStateOf {
+                readerSession.bookTitle ?: ""
+            },
             chapterTitle = derivedStateOf {
                 readingPosStats.value?.chapterTitle ?: ""
             },
@@ -58,12 +68,12 @@ internal class ReaderViewModel @Inject constructor(
             },
             chapterPercentageProgress = readerSession.readingChapterProgressPercentage,
             chaptersCount = derivedStateOf { readingPosStats.value?.chapterCount ?: 0 },
-            chapterUrl = derivedStateOf { readingPosStats.value?.chapterUrl ?: "" }
+            chapterUrl = derivedStateOf { readingPosStats.value?.chapterUrl ?: "" },
+            chapters = chaptersInBook,
         ),
         settings = ReaderScreenState.Settings(
             selectedSetting = mutableStateOf(ReaderScreenState.Settings.Type.None),
             isTextSelectable = appPreferences.READER_SELECTABLE_TEXT.state(viewModelScope),
-            keepScreenOn = appPreferences.READER_KEEP_SCREEN_ON.state(viewModelScope),
             textToSpeech = readerSession.readerTextToSpeech.state,
             liveTranslation = readerSession.readerLiveTranslation.state,
             fullScreen = appPreferences.READER_FULL_SCREEN.state(viewModelScope),
@@ -72,6 +82,14 @@ internal class ReaderViewModel @Inject constructor(
                 currentTheme = derivedStateOf { themeId.value.toTheme },
                 textFont = appPreferences.READER_FONT_FAMILY.state(viewModelScope),
                 textSize = appPreferences.READER_FONT_SIZE.state(viewModelScope),
+                textIndent = appPreferences.READER_TEXT_INDENT.state(viewModelScope),
+                pageTurnVolumeKeys = appPreferences.READER_PAGE_TURN_VOLUME_KEYS.state(viewModelScope),
+                pageTurnTapEdge = appPreferences.READER_PAGE_TURN_TAP_EDGE.state(viewModelScope),
+                marginLevel = appPreferences.READER_MARGIN_LEVEL.state(viewModelScope),
+                lineSpacingLevel = appPreferences.READER_LINE_SPACING_LEVEL.state(viewModelScope),
+                lineBreakHeight = appPreferences.READER_LINE_BREAK_HEIGHT.state(viewModelScope),
+                orientation = appPreferences.READER_ORIENTATION.state(viewModelScope),
+                keepScreenOn = appPreferences.READER_KEEP_SCREEN_ON.state(viewModelScope),
             )
         ),
         showInvalidChapterDialog = mutableStateOf(false)
@@ -129,5 +147,64 @@ internal class ReaderViewModel @Inject constructor(
 
     fun saveCurrentReadingPosition() {
         readerSession.saveCurrentPosition(readingCurrentChapter)
+    }
+
+    fun openChapterFromList(chapterUrl: String) {
+        val chapterIndex = chaptersLoader.orderedChapters.indexOfFirst { it.url == chapterUrl }
+        if (chapterIndex == -1) {
+            state.showInvalidChapterDialog.value = true
+            return
+        }
+
+        saveCurrentReadingPosition()
+        readingCurrentChapter = ChapterState(
+            chapterUrl = chapterUrl,
+            chapterItemPosition = 0,
+            offset = 0,
+        )
+        chaptersLoader.tryLoadInitial(chapterIndex = chapterIndex)
+    }
+
+    fun downloadChapterFromList(chapterUrl: String) {
+        viewModelScope.launch {
+            appRepository.chapterBody.fetchBody(chapterUrl)
+        }
+    }
+
+    fun navigateToNextChapter() {
+        val currentIndex = chaptersLoader.orderedChapters.indexOfFirst {
+            it.url == readingCurrentChapter.chapterUrl
+        }
+        if (currentIndex != -1 && currentIndex < chaptersLoader.orderedChapters.size - 1) {
+            val nextChapter = chaptersLoader.orderedChapters[currentIndex + 1]
+            openChapterFromList(nextChapter.url)
+        }
+    }
+
+    fun navigateToPreviousChapter() {
+        val currentIndex = chaptersLoader.orderedChapters.indexOfFirst {
+            it.url == readingCurrentChapter.chapterUrl
+        }
+        if (currentIndex > 0) {
+            val previousChapter = chaptersLoader.orderedChapters[currentIndex - 1]
+            openChapterFromList(previousChapter.url)
+        }
+    }
+
+    fun downloadAllChapters() {
+        viewModelScope.launch {
+            chaptersInBook.value.forEach { chapter ->
+                appRepository.chapterBody.fetchBody(chapter.chapter.url)
+            }
+        }
+    }
+
+    fun deleteAllChapters() {
+        viewModelScope.launch {
+            val chapterUrls = chaptersInBook.value.map { it.chapter.url }
+            if (chapterUrls.isNotEmpty()) {
+                appRepository.chapterBody.removeRows(chapterUrls)
+            }
+        }
     }
 }

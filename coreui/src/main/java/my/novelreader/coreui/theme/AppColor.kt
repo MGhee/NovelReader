@@ -48,6 +48,26 @@ val black_appColor = AppColor(
     tintedSelectedSurface = Grey1000.mix(ColorAccent, 0.75f),
 )
 
+val darkTeal_appColor = AppColor(
+    tabSurface = TealDark800,
+    bookSurface = TealDark800,
+    checkboxPositive = Success500,
+    checkboxNegative = Error500,
+    checkboxNeutral = TealDark900,
+    tintedSurface = TealDark900.mix(TealMid, 0.65f),
+    tintedSelectedSurface = TealDark900.mix(TealMid, 0.75f),
+)
+
+val sepia_appColor = AppColor(
+    tabSurface = SepiaLight50,
+    bookSurface = SepiaLight50,
+    checkboxPositive = Success500,
+    checkboxNegative = Error500,
+    checkboxNeutral = SepiaDark,
+    tintedSurface = SepiaLight.mix(ColorAccent, 0.65f),
+    tintedSelectedSurface = SepiaLight.mix(ColorAccent, 0.75f),
+)
+
 val LocalAppColor = compositionLocalOf { light_appColor }
 
 @Suppress("UnusedReceiverParameter")

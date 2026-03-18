@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+	<style name="AppTheme.BaseDark.DarkTeal">
+		<item name="colorPrimary">@color/color_0d4d5c</item>
+		<item name="colorPrimaryTransparent">@color/color_0d4d5c_transparent</item>
+		<item name="colorPrimaryDark">@color/color_0a3d4a</item>
+		<item name="colorOnPrimary">@color/color_ee</item>
+		<item name="colorSecondary">@color/color_1a6b7d</item>
+		<item name="colorOnSecondary">?colorOnPrimary</item>
+		<item name="colorSurface">@color/color_0a1b20</item>
+		<item name="colorOnSurface">?colorOnPrimary</item>
+		<item name="colorOnBackground">?colorOnPrimary</item>
+
+		<item name="android:colorBackground">@color/color_0a1b20</item>
+
+		<item name="myColorControlNormalPale">@color/color_66</item>
+
+		<item name="bottomSheetDialogTheme">@style/myBottomSheetDialogStyle.BaseDark.DarkTeal</item>
+
+	</style>
+
+	<style name="myBottomSheetStyle.BaseDark.DarkTeal">
+		<item name="backgroundTint">@color/color_0a1b20</item>
+	</style>
+
+	<style name="myBottomSheetDialogStyle.BaseDark.DarkTeal">
+		<item name="bottomSheetStyle">@style/myBottomSheetStyle.BaseDark.DarkTeal</item>
+	</style>
+
+</resources>

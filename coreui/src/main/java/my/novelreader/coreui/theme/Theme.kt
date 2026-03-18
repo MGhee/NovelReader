@@ -45,12 +45,16 @@ fun InternalTheme(
         Themes.LIGHT -> light_colorScheme
         Themes.DARK -> dark_colorScheme
         Themes.BLACK -> black_colorScheme
+        Themes.DARK_TEAL -> darkTeal_colorScheme
+        Themes.SEPIA -> sepia_colorScheme
     }
 
     val appColor = when (theme) {
         Themes.LIGHT -> light_appColor
         Themes.DARK -> dark_appColor
         Themes.BLACK -> black_appColor
+        Themes.DARK_TEAL -> darkTeal_appColor
+        Themes.SEPIA -> sepia_appColor
     }
 
     val systemUiController = rememberSystemUiController()

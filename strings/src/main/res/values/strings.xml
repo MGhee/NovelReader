@@ -74,6 +74,7 @@
     <string name="reload">Reload</string>
     <string name="remove_selected_chapters_downloads">Remove selected chapters\' downloads</string>
     <string name="download_selected_chapters">Download selected chapters</string>
+    <string name="download_all_chapters">Download all chapters</string>
     <string name="set_as_read_selected_chapters">Set as read selected chapters</string>
     <string name="set_as_read_up_to_selected_chapter">Set as read up to selected chapter</string>
     <string name="set_as_Unread_up_to_selected_chapter">Set as Unread up to selected chapter</string>
@@ -81,6 +82,9 @@
     <string name="select_all_chapters">Select all chapters</string>
     <string name="close_selection_bar">Close selection bar</string>
     <string name="open_last_read_chapter">Open last read chapter</string>
+    <string name="last_read_chapter_not_found_opening_first">Last read chapter not found, opening first chapter</string>
+    <string name="unable_to_open_book_no_chapters_found">Unable to open book: no chapters found</string>
+    <string name="downloading_all_chapters_started">Downloading all chapters in background</string>
     <string name="updating_book_info">Updating book info</string>
     <string name="backup_options">Backup options</string>
     <string name="save_images">Save images</string>
@@ -201,4 +205,26 @@
     <string name="cloudfare_firewall_failed_bypass">Cloudfare firewall failed bypass</string>
     <string name="tried_but_failed_to_bypass_cloudfare_firewall">Tried but failed to bypass cloudfare firewall</string>
     <string name="features_reader_full_screen">Full screen</string>
+    <string name="background">Background</string>
+    <string name="orientation">Orientation</string>
+    <string name="vertical">Vertical</string>
+    <string name="horizontal">Horizontal</string>
+    <string name="font_size">Font size</string>
+    <string name="font_family">Font family</string>
+    <string name="margin">Margin</string>
+    <string name="line_spacing">Line spacing</string>
+    <string name="line_break_height">Line break height</string>
+    <string name="use_text_indent">Use text indent</string>
+    <string name="page_turning_volume_keys">Page turning by volume keys</string>
+    <string name="page_turning_tap_edge">Page turning by tap edge</string>
+    <string name="chapter_list">Chapter list</string>
+    <string name="download_chapters">Download chapters</string>
+    <string name="previous_chapter">Previous chapter</string>
+    <string name="next_chapter">Next chapter</string>
+    <string name="delete_all_chapters">Delete all chapters</string>
+    <string name="re_download_chapters">Re-download chapters</string>
+    <string name="delete_downloaded_chapters">Delete downloaded chapters</string>
+    <string name="delete_book">Delete book</string>
+    <string name="theme_name_dark_teal">Dark teal</string>
+    <string name="theme_name_sepia">Sepia</string>
 </resources>

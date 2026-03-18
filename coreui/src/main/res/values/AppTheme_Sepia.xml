@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+	<style name="AppTheme.Sepia" parent="Theme.MaterialComponents.Light.NoActionBar.Bridge">
+		<item name="isLightTheme">true</item>
+		<item name="android:windowLightStatusBar">true</item>
+		<item name="android:statusBarColor">?colorPrimary</item>
+
+		<item name="colorAccent">@color/colorAccent</item>
+		<item name="colorAccentTransparent">@color/colorAccent_transparent</item>
+
+		<item name="colorPrimary">@color/color_f4e5d3</item>
+		<item name="colorPrimaryTransparent">@color/color_f4e5d3_transparent</item>
+		<item name="colorPrimaryDark">@color/color_e8d4bf</item>
+		<item name="colorOnPrimary">@color/color_4a3728</item>
+		<item name="colorSecondary">?colorPrimary</item>
+		<item name="colorOnSecondary">?colorOnPrimary</item>
+		<item name="colorSurface">?colorPrimary</item>
+		<item name="colorOnSurface">?colorOnPrimary</item>
+		<item name="colorOnBackground">?colorOnPrimary</item>
+
+		<item name="android:colorBackground">@color/color_faf5f0</item>
+		<item name="android:colorEdgeEffect">?colorAccent</item>
+
+		<item name="bottomNavigationStyle">@style/myBottomNavigationStyle.Sepia</item>
+		<item name="buttonStyle">@style/myButtonStyle</item>
+		<item name="myReaderTextStyle">@style/myReaderTextStyle.Sepia</item>
+		<item name="tabStyle">@style/myTabLayout</item>
+		<item name="appBarLayoutStyle">@style/myAppBarLayoutStyle</item>
+
+		<item name="noneStateTint">@color/color_4a3728</item>
+		<item name="positiveStateTint">@color/dark_green</item>
+		<item name="negativeStateTint">@color/dark_red</item>
+		<item name="myColorControlNormalPale">@color/color_c9b8a5</item>
+
+		<item name="android:scrollbarThumbVertical">@drawable/scrollbar_thumb</item>
+
+		<item name="bottomSheetDialogTheme">@style/myBottomSheetDialogStyle.Sepia</item>
+	</style>
+
+	<style name="myReaderTextStyle.Sepia">
+		<item name="android:textColor">@color/color_4a3728</item>
+	</style>
+
+	<style name="myBottomNavigationStyle.Sepia" parent="myBottomNavigationStyle">
+		<item name="itemIconTint">@color/color_8b7355</item>
+		<item name="itemTextColor">@color/color_8b7355</item>
+	</style>
+
+	<style name="myBottomSheetStyle.Sepia">
+		<item name="backgroundTint">@color/color_f4e5d3</item>
+	</style>
+
+	<style name="myBottomSheetDialogStyle.Sepia">
+		<item name="bottomSheetStyle">@style/myBottomSheetStyle.Sepia</item>
+	</style>
+
+</resources>

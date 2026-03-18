@@ -7,15 +7,13 @@
 	android:layout_height="match_parent"
 	>
 
-	<ListView
-		android:id="@+id/listView"
+	<my.novelreader.features.reader.view.ReaderView
+		android:id="@+id/readerView"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
 		android:clickable="false"
 		android:defaultFocusHighlightEnabled="false"
-		android:divider="@null"
 		android:hapticFeedbackEnabled="false"
-		android:listSelector="#0000"
 		android:longClickable="false"
 		android:scrollbars="none"
 		android:visibility="invisible"

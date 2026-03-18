@@ -28,6 +28,7 @@ internal class LibraryPageViewModel @Inject constructor(
     var isPullRefreshing by mutableStateOf(false)
     val listReading by createPageList(isShowCompleted = false)
     val listCompleted by createPageList(isShowCompleted = true)
+    val list by createPageList(isShowCompleted = false)
 
     private fun createPageList(isShowCompleted: Boolean) = appRepository.libraryBooks
         .getBooksInLibraryWithContextFlow
@@ -55,6 +56,11 @@ internal class LibraryPageViewModel @Inject constructor(
             delay(3000L)
             isPullRefreshing = false
         }
+    }
+
+    fun onLibraryRefresh() {
+        showLoadingSpinner()
+        toasty.show(R.string.updating_library_notice)
     }
 
     @Suppress("UNUSED_PARAMETER")

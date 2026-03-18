@@ -64,3 +64,20 @@ val Info700 = Color(0xFF76840F)
 val Info800 = Color(0xFF5F6D0C)
 val Info900 = Color(0xFF48550A)
 val Info1000 = Color(0xFF333E07)
+
+// Teal theme colors
+val TealDark900 = Color(0xFF0A1B20)
+val TealDark800 = Color(0xFF0A3D4A)
+val TealDark700 = Color(0xFF0D4D5C)
+val TealDark600 = Color(0xFF106B75)
+val TealMid = Color(0xFF1A6B7D)
+val TealLight300 = Color(0xFF5BA5B8)
+
+// Sepia theme colors
+val SepiaLight = Color(0xFFF4E5D3)
+val SepiaLight50 = Color(0xFFFAF5F0)
+val SepiaLight200 = Color(0xFFEFDEC9)
+val SepiaLight300 = Color(0xFFE8D4BF)
+val SepiaMedium600 = Color(0xFF8B7355)
+val SepiaDark = Color(0xFF4A3728)
+val SepiaDark200 = Color(0xFF6B5843)

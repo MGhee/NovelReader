@@ -35,6 +35,22 @@
 	<color name="color_20_transparent">#00202020</color>
 	<color name="color_00_transparent">#00000000</color>
 
+	<!-- Teal theme colors -->
+	<color name="color_0d4d5c">#0d4d5c</color>
+	<color name="color_0d4d5c_transparent">#000d4d5c</color>
+	<color name="color_0a3d4a">#0a3d4a</color>
+	<color name="color_1a6b7d">#1a6b7d</color>
+	<color name="color_0a1b20">#0a1b20</color>
+
+	<!-- Sepia theme colors -->
+	<color name="color_f4e5d3">#f4e5d3</color>
+	<color name="color_f4e5d3_transparent">#00f4e5d3</color>
+	<color name="color_e8d4bf">#e8d4bf</color>
+	<color name="color_faf5f0">#faf5f0</color>
+	<color name="color_4a3728">#4a3728</color>
+	<color name="color_8b7355">#8b7355</color>
+	<color name="color_c9b8a5">#c9b8a5</color>
+
 	<color name="colorError">#EC4427</color>
 	<color name="colorAccent">#2A59B6</color>
 	<color name="colorAccent_transparent">#332A59B6</color>

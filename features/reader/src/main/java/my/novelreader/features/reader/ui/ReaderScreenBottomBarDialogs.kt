@@ -25,6 +25,13 @@ internal fun ReaderScreenBottomBarDialogs(
     onThemeSelected: (Themes) -> Unit,
     onKeepScreenOn: (Boolean) -> Unit,
     onFullScreen: (Boolean) -> Unit,
+    onOrientationChange: (my.novelreader.core.appPreferences.ReaderOrientation) -> Unit,
+    onTextIndentChange: (Boolean) -> Unit,
+    onMarginLevelChange: (my.novelreader.core.appPreferences.ReaderMarginLevel) -> Unit,
+    onLineSpacingLevelChange: (my.novelreader.core.appPreferences.ReaderLineSpacingLevel) -> Unit,
+    onLineBreakHeightChange: (Int) -> Unit,
+    onOpenChaptersList: () -> Unit,
+    onCloseStyleDialog: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -47,15 +54,23 @@ internal fun ReaderScreenBottomBarDialogs(
                             onThemeChange = onThemeSelected,
                             onTextFontChange = onTextFontChanged,
                             onTextSizeChange = onTextSizeChanged,
+                            onTextIndentChange = onTextIndentChange,
+                            onMarginLevelChange = onMarginLevelChange,
+                            onLineSpacingLevelChange = onLineSpacingLevelChange,
+                            onLineBreakHeightChange = onLineBreakHeightChange,
+                            onKeepScreenOnChange = onKeepScreenOn,
+                            onOrientationChange = onOrientationChange,
+                            onClose = onCloseStyleDialog,
                         )
                     }
                     ReaderScreenState.Settings.Type.More -> MoreSettingDialog(
                         allowTextSelection = settings.isTextSelectable.value,
                         onAllowTextSelectionChange = onSelectableTextChange,
-                        keepScreenOn = settings.keepScreenOn.value,
-                        onKeepScreenOn = onKeepScreenOn,
                         fullScreen = settings.fullScreen.value,
                         onFullScreen = onFullScreen,
+                        orientation = settings.style.orientation.value,
+                        onOrientationChange = onOrientationChange,
+                        onOpenChaptersList = onOpenChaptersList,
                     )
                     ReaderScreenState.Settings.Type.None -> Unit
                 }

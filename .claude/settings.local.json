@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find b:/NovelReader -name *.kt -path */libraryExplorer/* -o -path */reader/ReaderViewModel.kt -o -path */reader/ReaderActivity.kt)",
+      "Bash(xargs wc:*)"
+    ]
+  }
+}

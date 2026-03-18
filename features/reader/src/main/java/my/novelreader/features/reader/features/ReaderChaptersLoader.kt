@@ -142,14 +142,18 @@ internal class ReaderChaptersLoader(
     fun tryLoadPrevious() {
         if (LoadChapter.Type.Previous in loaderQueue) return
         loaderQueue.add(LoadChapter.Type.Previous)
-        launch { chapterLoaderFlow.emit(LoadChapter.Previous) }
+        launch {
+            chapterLoaderFlow.emit(LoadChapter.Previous)
+        }
     }
 
     @Synchronized
     fun tryLoadNext() {
         if (LoadChapter.Type.Next in loaderQueue) return
         loaderQueue.add(LoadChapter.Type.Next)
-        launch { chapterLoaderFlow.emit(LoadChapter.Next) }
+        launch {
+            chapterLoaderFlow.emit(LoadChapter.Next)
+        }
     }
 
     fun reload() {
@@ -535,12 +539,14 @@ internal class ReaderChaptersLoader(
         when (val res = readerRepository.downloadChapter(chapter.url)) {
             is Response.Success -> {
                 // Split chapter text into items
-                val itemsOriginal = textToItemsConverter(
+                var itemsOriginal = textToItemsConverter(
                     chapterUrl = chapter.url,
                     chapterIndex = chapterIndex,
                     chapterItemPositionDisplacement = chapterItemPosition,
                     text = res.data,
                 )
+                // Paragraph spacing is now controlled via Body item bottom margin
+                // itemsOriginal = insertParagraphSpacing(itemsOriginal, chapterIndex)
                 chapterItemPosition += itemsOriginal.size
 
                 val itemTranslationAttribution = if (translatorIsActive()) {
@@ -692,5 +698,26 @@ internal class ReaderChaptersLoader(
                 }
             }
         }
+    }
+
+    /**
+     * Insert Padding items between consecutive Body items for paragraph spacing.
+     * This allows lineBreakHeight to properly space paragraphs.
+     */
+    private fun insertParagraphSpacing(items: List<ReaderItem>, chapterIndex: Int): List<ReaderItem> {
+        if (items.isEmpty()) return items
+
+        val result = mutableListOf<ReaderItem>()
+
+        for (i in items.indices) {
+            result.add(items[i])
+
+            // Add spacing between consecutive Body items
+            if (i < items.size - 1 && items[i] is ReaderItem.Body && items[i + 1] is ReaderItem.Body) {
+                result.add(ReaderItem.Padding(chapterIndex = chapterIndex))
+            }
+        }
+
+        return result
     }
 }
