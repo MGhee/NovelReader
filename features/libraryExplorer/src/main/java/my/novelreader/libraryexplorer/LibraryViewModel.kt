@@ -1,11 +1,13 @@
 package my.novelreader.libraryexplorer
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import my.novelreader.core.Toasty
 import my.novelreader.coreui.BaseViewModel
@@ -34,8 +36,26 @@ internal class LibraryViewModel @Inject constructor(
         default = { null }
     )
 
+    // Download progress tracking: maps bookUrl to Pair(downloadedCount, totalCount)
+    var downloadProgress by mutableStateOf<Map<String, Pair<Int, Int>>>(emptyMap())
+
+    // Pull-to-refresh state
+    var isPullRefreshing by mutableStateOf(false)
+
+    // List of books to display (all books from library)
+    private val _list = mutableStateOf<List<BookWithContext>>(emptyList())
+    val list: List<BookWithContext> get() = _list.value
+
     var readFilter by appPreferences.LIBRARY_FILTER_READ.state(viewModelScope)
     var readSort by appPreferences.LIBRARY_SORT_LAST_READ.state(viewModelScope)
+
+    init {
+        viewModelScope.launch {
+            appRepository.libraryBooks.getBooksInLibraryWithContextFlow.collect {
+                _list.value = it
+            }
+        }
+    }
 
     fun readFilterToggle() {
         readFilter = readFilter.next()
@@ -43,6 +63,17 @@ internal class LibraryViewModel @Inject constructor(
 
     fun readSortToggle() {
         readSort = readSort.next()
+    }
+
+    fun onLibraryRefresh() {
+        isPullRefreshing = true
+        viewModelScope.launch {
+            try {
+                workersInteractions.checkForLibraryUpdates(my.novelreader.core.domain.LibraryCategory.DEFAULT)
+            } finally {
+                isPullRefreshing = false
+            }
+        }
     }
 
     fun bookCompletedToggle(bookUrl: String) {
@@ -75,13 +106,31 @@ internal class LibraryViewModel @Inject constructor(
     }
 
     fun downloadAllBookChapters(bookUrl: String) {
-        toasty.show(R.string.downloading_all_chapters_started)
         viewModelScope.launch {
             val chapters = appRepository.bookChapters.chapters(bookUrl)
+            val downloadedCount = appRepository.chapterBody.getDownloadedCount(bookUrl)
+
+            if (downloadedCount == chapters.size && chapters.isNotEmpty()) {
+                toasty.show(R.string.all_chapters_already_downloaded)
+                return@launch
+            }
+
+            toasty.show(R.string.downloading_all_chapters_started)
+
             var downloaded = 0
             chapters.forEach { chapter ->
                 appRepository.chapterBody.fetchBody(chapter.url)
                 downloaded++
+
+                // Update progress map
+                downloadProgress = downloadProgress.toMutableMap().apply {
+                    put(bookUrl, Pair(downloaded, chapters.size))
+                }
+            }
+
+            // Clear progress when done
+            downloadProgress = downloadProgress.toMutableMap().apply {
+                remove(bookUrl)
             }
         }
     }
@@ -124,10 +173,23 @@ internal class LibraryViewModel @Inject constructor(
 
             // Now download all chapters again
             val chaptersToDownload = appRepository.bookChapters.chapters(bookUrl)
+            toasty.show(R.string.downloading_all_chapters_started)
+
+            var downloaded = 0
             chaptersToDownload.forEach { chapter ->
                 appRepository.chapterBody.fetchBody(chapter.url)
+                downloaded++
+
+                // Update progress map
+                downloadProgress = downloadProgress.toMutableMap().apply {
+                    put(bookUrl, Pair(downloaded, chaptersToDownload.size))
+                }
             }
-            toasty.show(R.string.downloading_all_chapters_started)
+
+            // Clear progress when done
+            downloadProgress = downloadProgress.toMutableMap().apply {
+                remove(bookUrl)
+            }
         }
     }
 

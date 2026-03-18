@@ -37,6 +37,7 @@ androidx-startup = "1.1.1"
 androidx-constraintLayout = "2.1.4"
 androidx-coordinatorLayout = "1.2.0"
 androidx-appcompat = "1.7.0"
+androidx-viewpager2 = "1.1.0"
 
 androidx-testing-core = "1.6.1"
 androidx-testing-runner = "1.6.1"
@@ -164,6 +165,7 @@ androidx-media = { module = "androidx.media:media", version.ref = "androidx-medi
 androidx-navigation-ui-ktx = { module = "androidx.navigation:navigation-ui-ktx", version.ref = "androidx-navigation-ui-ktx" }
 androidx-navigation-fragment-ktx = { module = "androidx.navigation:navigation-fragment-ktx", version.ref = "androidx-navigation-fragment-ktx" }
 androidx-preference-ktx = { module = "androidx.preference:preference-ktx", version.ref = "androidx-preference-ktx" }
+androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "androidx-viewpager2" }
 
 material = { module = "com.google.android.material:material", version.ref = "androidx-material" }
 

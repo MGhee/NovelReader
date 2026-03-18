@@ -1,16 +1,13 @@
 package my.novelreader.features.reader.view
 
 import android.content.Context
-import android.util.AttributeSet
 import android.util.DisplayMetrics
 import android.view.View
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
-import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
 
-class ReaderLayoutManager(context: Context) : GridLayoutManager(context, 1) {
+class ReaderLayoutManager(context: Context) : LinearLayoutManager(context) {
 
     companion object {
         private const val MILLISECONDS_PER_INCH = 15f
@@ -18,26 +15,6 @@ class ReaderLayoutManager(context: Context) : GridLayoutManager(context, 1) {
     }
 
     private var recyclerView: RecyclerView? = null
-    private var snapHelper: ReaderSnapHelper? = null
-    private val mContext = context
-
-    inner class ReaderSnapHelper : PagerSnapHelper() {
-        override fun createScroller(layoutManager: RecyclerView.LayoutManager?): RecyclerView.SmoothScroller? {
-            if (layoutManager !is RecyclerView.SmoothScroller.ScrollVectorProvider) {
-                return super.createScroller(layoutManager)
-            }
-
-            return object : LinearSmoothScroller(mContext) {
-                override fun calculateSpeedPerPixel(displayMetrics: DisplayMetrics): Float {
-                    return MILLISECONDS_PER_INCH / displayMetrics.densityDpi
-                }
-
-                override fun calculateTimeForScrolling(dx: Int): Int {
-                    return kotlin.math.min(MAX_SCROLL_ON_FLING_DURATION, super.calculateTimeForScrolling(dx))
-                }
-            }
-        }
-    }
 
     fun attachToRecyclerView(recyclerView: RecyclerView?) {
         this.recyclerView = recyclerView
@@ -54,19 +31,6 @@ class ReaderLayoutManager(context: Context) : GridLayoutManager(context, 1) {
         }
     }
 
-    override fun setOrientation(orientation: Int) {
-        if (orientation == HORIZONTAL && snapHelper == null) {
-            snapHelper = ReaderSnapHelper()
-            snapHelper?.attachToRecyclerView(recyclerView)
-            spanCount = 1  // Ensure single column in horizontal mode
-        } else if (orientation == VERTICAL && snapHelper != null) {
-            snapHelper?.attachToRecyclerView(null)
-            snapHelper = null
-            spanCount = 1  // Single column in vertical mode
-        }
-        super.setOrientation(orientation)
-    }
-
     fun smoothScrollToPositionWithOffset(position: Int, offset: Int, duration: Int = 500) {
         val recyclerView = this.recyclerView ?: return
 
@@ -81,11 +45,6 @@ class ReaderLayoutManager(context: Context) : GridLayoutManager(context, 1) {
 
             override fun calculateDyToMakeVisible(view: View, snapPreference: Int): Int {
                 val result = super.calculateDyToMakeVisible(view, snapPreference)
-                return result + offset
-            }
-
-            override fun calculateDxToMakeVisible(view: View, snapPreference: Int): Int {
-                val result = super.calculateDxToMakeVisible(view, snapPreference)
                 return result + offset
             }
         }

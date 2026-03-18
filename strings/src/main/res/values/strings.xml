@@ -225,6 +225,7 @@
     <string name="re_download_chapters">Re-download chapters</string>
     <string name="delete_downloaded_chapters">Delete downloaded chapters</string>
     <string name="delete_book">Delete book</string>
+    <string name="all_chapters_already_downloaded">All chapters are already downloaded</string>
     <string name="theme_name_dark_teal">Dark teal</string>
     <string name="theme_name_sepia">Sepia</string>
 </resources>

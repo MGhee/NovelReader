@@ -4,24 +4,30 @@ package my.novelreader.libraryexplorer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import my.novelreader.coreui.components.BookImageButtonView
 import my.novelreader.coreui.components.BookTitlePosition
 import my.novelreader.coreui.modifiers.bounceOnPressed
@@ -33,38 +39,78 @@ internal fun LibraryPageBody(
     list: List<BookWithContext>,
     onClick: (BookWithContext) -> Unit,
     onMenuClick: (BookWithContext) -> Unit,
+    downloadProgress: Map<String, Pair<Int, Int>> = emptyMap(),
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(100.dp),
-        contentPadding = PaddingValues(top = 4.dp, bottom = 400.dp, start = 4.dp, end = 4.dp)
+        columns = GridCells.Adaptive(160.dp),
+        contentPadding = PaddingValues(top = 12.dp, bottom = 400.dp, start = 12.dp, end = 12.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
     ) {
         items(
             items = list,
             key = { it.book.url }
-        ) {
+        ) { book ->
             val interactionSource = remember { MutableInteractionSource() }
+            val progress = downloadProgress[book.book.url]
+            val isDownloading = progress != null
+
             Box(modifier = Modifier.fillMaxWidth()) {
-                BookImageButtonView(
-                    title = it.book.title,
-                    coverImageModel = rememberResolvedBookImagePath(
-                        bookUrl = it.book.url,
-                        imagePath = it.book.coverImageUrl
-                    ),
-                    bookTitlePosition = BookTitlePosition.Outside,
-                    onClick = { onClick(it) },
-                    interactionSource = interactionSource,
-                    modifier = Modifier.bounceOnPressed(interactionSource)
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    BookImageButtonView(
+                        title = book.book.title,
+                        coverImageModel = rememberResolvedBookImagePath(
+                            bookUrl = book.book.url,
+                            imagePath = book.book.coverImageUrl
+                        ),
+                        bookTitlePosition = BookTitlePosition.Outside,
+                        onClick = { onClick(book) },
+                        interactionSource = interactionSource,
+                        modifier = Modifier.bounceOnPressed(interactionSource)
+                    )
+
+                    // Progress bar overlaid at bottom of image when downloading
+                    if (isDownloading && progress != null) {
+                        val (downloaded, total) = progress
+                        val progressValue = if (total > 0) downloaded.toFloat() / total else 0f
+                        val percentage = (progressValue * 100).toInt()
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 51.dp, start = 4.dp, end = 4.dp)
+                                .height(24.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(androidx.compose.ui.graphics.Color.Gray.copy(alpha = 0.5f))
+                        ) {
+                            LinearProgressIndicator(
+                                progress = { progressValue },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(24.dp),
+                                color = androidx.compose.ui.graphics.Color.Green.copy(alpha = 0.7f),
+                                trackColor = androidx.compose.ui.graphics.Color.Transparent
+                            )
+                            Text(
+                                text = "$percentage%",
+                                fontSize = 14.sp,
+                                color = androidx.compose.ui.graphics.Color.White,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                    }
+                }
 
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 8.dp, bottom = 56.dp)
+                        .align(Alignment.TopEnd)
+                        .padding(end = 8.dp, top = 8.dp)
                         .background(
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                             CircleShape
                         )
-                        .padding(4.dp),
+                        .padding(2.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -72,8 +118,8 @@ internal fun LibraryPageBody(
                         contentDescription = stringResource(id = R.string.open_for_more_options),
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier
-                            .clickable { onMenuClick(it) }
-                            .padding(4.dp)
+                            .clickable { onMenuClick(book) }
+                            .padding(2.dp)
                     )
                 }
             }

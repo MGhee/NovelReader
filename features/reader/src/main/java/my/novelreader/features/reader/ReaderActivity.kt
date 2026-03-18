@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.material3.BasicAlertDialog
 import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.snapshotFlow
@@ -31,7 +32,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import my.novelreader.coreui.BaseActivity
@@ -45,8 +45,12 @@ import my.novelreader.core.utils.dpToPx
 import my.novelreader.core.utils.fadeIn
 import my.novelreader.core.appPreferences.ReaderOrientation
 import my.novelreader.features.reader.domain.ChapterState
+import my.novelreader.features.reader.domain.PageCalculator
+import my.novelreader.features.reader.domain.PageData
 import my.novelreader.features.reader.domain.ReaderItem
 import my.novelreader.features.reader.domain.ReaderItemAdapter
+import my.novelreader.features.reader.domain.ReaderItemBinder
+import my.novelreader.features.reader.domain.ReaderPageAdapter
 import my.novelreader.features.reader.domain.ReaderState
 import my.novelreader.features.reader.domain.indexOfReaderItem
 import my.novelreader.features.reader.view.ReaderLayoutManager
@@ -94,6 +98,10 @@ class ReaderActivity : BaseActivity() {
     private val viewModel by viewModels<ReaderViewModel>()
 
     private val viewBind by lazy { ActivityReaderBinding.inflate(layoutInflater) }
+
+    // Pages for horizontal mode
+    private val pages = mutableListOf<PageData>()
+
     private val readerAdapter by lazy {
         ReaderItemAdapter(
             this@ReaderActivity,
@@ -117,15 +125,140 @@ class ReaderActivity : BaseActivity() {
         )
     }
 
+    private val readerItemBinder by lazy {
+        ReaderItemBinder(
+            ctx = this@ReaderActivity,
+            bookUrl = viewModel.bookUrl,
+            currentSpeakerActiveItem = { viewModel.readerSpeaker.currentTextPlaying.value },
+            currentTextSelectability = { appPreferences.READER_SELECTABLE_TEXT.value },
+            currentFontSize = { appPreferences.READER_FONT_SIZE.value },
+            currentTypeface = { fontsLoader.getTypeFaceNORMAL(appPreferences.READER_FONT_FAMILY.value) },
+            currentTypefaceBold = { fontsLoader.getTypeFaceBOLD(appPreferences.READER_FONT_FAMILY.value) },
+            currentMarginDp = { appPreferences.READER_MARGIN_LEVEL.value.dpValue },
+            currentLineSpacingMultiplier = { appPreferences.READER_LINE_SPACING_LEVEL.value.multiplier },
+            currentLineBreakHeight = { appPreferences.READER_LINE_BREAK_HEIGHT.value },
+            currentTextIndent = { appPreferences.READER_TEXT_INDENT.value },
+            onChapterStartVisible = viewModel::markChapterStartAsSeen,
+            onChapterEndVisible = viewModel::markChapterEndAsSeen,
+            onReloadReader = viewModel::reloadReader,
+            onClick = {
+                viewModel.state.showReaderInfo.value = !viewModel.state.showReaderInfo.value
+            },
+        )
+    }
+
+    private val readerPageAdapter by lazy {
+        ReaderPageAdapter(
+            ctx = this@ReaderActivity,
+            pages = pages,
+            binder = readerItemBinder,
+            onClick = {
+                viewModel.state.showReaderInfo.value = !viewModel.state.showReaderInfo.value
+            }
+        )
+    }
+
+    private val pageCalculator by lazy {
+        PageCalculator(ctx = this@ReaderActivity, binder = readerItemBinder)
+    }
+
     private val fontsLoader = FontsLoader(this)
 
+    private fun isHorizontalMode(): Boolean =
+        appPreferences.READER_ORIENTATION.value == ReaderOrientation.Horizontal
+
     private fun applyReaderOrientation() {
-        val orientationValue = when (appPreferences.READER_ORIENTATION.value) {
-            ReaderOrientation.Horizontal -> RecyclerView.HORIZONTAL
-            ReaderOrientation.Vertical -> RecyclerView.VERTICAL
+        if (isHorizontalMode()) {
+            if (viewBind.readerView.visibility == android.view.View.VISIBLE) {
+                // Switching from vertical to horizontal - get current position from RecyclerView
+                val currentItemIndex = getCurrentItemIndexFromRecyclerView()
+
+                // Hide RecyclerView
+                viewBind.readerView.visibility = android.view.View.GONE
+
+                // Recalculate pages - this runs on background thread
+                recalculatePages()
+
+                // After a short delay, show ViewPager2 (pages should be ready by then)
+                lifecycleScope.launch {
+                    delay(150)
+                    viewBind.readerPager.visibility = android.view.View.VISIBLE
+                    val pageIndex = findPageForItemIndex(currentItemIndex)
+                    if (pages.isNotEmpty()) {
+                        viewBind.readerPager.setCurrentItem(pageIndex, false)
+                    }
+                }
+            } else {
+                // Already in horizontal mode, just ensure ViewPager2 is visible
+                viewBind.readerPager.visibility = android.view.View.VISIBLE
+            }
+        } else {
+            // Switching from horizontal to vertical
+            val currentItemIndex = if (viewBind.readerPager.visibility == android.view.View.VISIBLE) {
+                getCurrentItemIndexFromPager()
+            } else {
+                getCurrentItemIndexFromRecyclerView()
+            }
+
+            viewBind.readerPager.visibility = android.view.View.GONE
+            viewBind.readerView.visibility = android.view.View.VISIBLE
+            val position = readerAdapter.fromIndexToPosition(currentItemIndex)
+            if (position >= 0) {
+                viewBind.readerView.layoutManager?.scrollToPosition(position)
+            }
+            readerAdapter.notifyDataSetChanged()
         }
-        viewBind.readerView.setOrientation(orientationValue)
-        readerAdapter.notifyDataSetChanged()
+    }
+
+    private fun recalculatePages() {
+        lifecycleScope.launch(Dispatchers.Default) {
+            pages.clear()
+
+            // Try multiple sources for available height
+            val availableHeight = when {
+                viewBind.readerPager.height > 0 -> viewBind.readerPager.height
+                viewBind.readerView.height > 0 -> viewBind.readerView.height
+                else -> {
+                    // If not laid out yet, use window height minus status/navigation bars
+                    val displayMetrics = resources.displayMetrics
+                    (displayMetrics.heightPixels * 0.85).toInt() // Rough estimate
+                }
+            }
+
+            android.util.Log.d("ReaderActivity", "recalculatePages: availableHeight=$availableHeight, itemCount=${viewModel.items.size}")
+
+            if (availableHeight > 100 && viewModel.items.isNotEmpty()) {
+                val calculatedPages = pageCalculator.calculatePages(viewModel.items, availableHeight)
+                withContext(Dispatchers.Main) {
+                    pages.addAll(calculatedPages)
+                    android.util.Log.d("ReaderActivity", "recalculatePages: calculated ${pages.size} pages")
+                    readerPageAdapter.notifyDataSetChanged()
+                }
+            } else {
+                android.util.Log.w("ReaderActivity", "recalculatePages: skipped - height=$availableHeight, items=${viewModel.items.size}")
+            }
+        }
+    }
+
+    private fun getCurrentItemIndexFromRecyclerView(): Int {
+        val layoutManager = viewBind.readerView.layoutManager
+        val firstVisiblePosition = (layoutManager as? ReaderLayoutManager)?.findFirstVisibleItemPosition() ?: 0
+        return readerAdapter.fromPositionToIndex(firstVisiblePosition)
+    }
+
+    private fun getCurrentItemIndexFromPager(): Int {
+        if (pages.isEmpty()) return 0
+        val currentPage = viewBind.readerPager.currentItem
+        return pages.getOrNull(currentPage)?.firstItemIndex ?: 0
+    }
+
+    private fun findPageForItemIndex(itemIndex: Int): Int {
+        for ((pageIndex, page) in pages.withIndex()) {
+            if (itemIndex >= page.firstItemIndex && itemIndex < page.firstItemIndex + page.items.size) {
+                return pageIndex
+            }
+        }
+        return 0
     }
 
     override fun onBackPressed() {
@@ -143,6 +276,20 @@ class ReaderActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBind.readerView.adapter = readerAdapter
+
+        // Set up ViewPager2 for horizontal mode
+        viewBind.readerPager.adapter = readerPageAdapter
+        viewBind.readerPager.offscreenPageLimit = 1
+        viewBind.readerPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                val page = pages.getOrNull(position) ?: return
+                updateCurrentReadingPosSavingState(firstVisibleItemIndex = page.firstItemIndex)
+                updateInfoView()
+                if (position >= pages.size - 2) viewModel.chaptersLoader.tryLoadNext()
+                if (position <= 1) viewModel.chaptersLoader.tryLoadPrevious()
+            }
+        })
+
         fadeInTextLiveData.distinctUntilChanged().observe(this) {
             if (it) {
                 viewBind.readerView.fadeIn(durationMillis = 150)
@@ -174,22 +321,6 @@ class ReaderActivity : BaseActivity() {
         snapshotFlow { viewModel.state.settings.style.textIndent.value }.drop(1)
             .asLiveData()
             .observe(this) { hardRefreshReaderListWithFlicker() }
-
-        // Set initial orientation
-        applyReaderOrientation()
-
-        // Observe orientation changes via preference
-        lifecycleScope.launch {
-            var lastOrientation = appPreferences.READER_ORIENTATION.value
-            while (isActive) {
-                delay(500)
-                val currentOrientation = appPreferences.READER_ORIENTATION.value
-                if (currentOrientation != lastOrientation) {
-                    lastOrientation = currentOrientation
-                    applyReaderOrientation()
-                }
-            }
-        }
 
         readerViewHandlersActions.forceUpdateListViewState = {
             withContext(Dispatchers.Main.immediate) {
@@ -392,6 +523,20 @@ class ReaderActivity : BaseActivity() {
 
 
         readerAdapter.notifyDataSetChanged()
+
+        // Apply saved orientation after data is fully loaded
+        lifecycleScope.launch {
+            var attempts = 0
+            while (attempts < 20 && viewModel.items.isEmpty()) {
+                delay(50)
+                attempts++
+            }
+            // Now data should be loaded, apply orientation
+            if (isHorizontalMode() && viewModel.items.isNotEmpty()) {
+                applyReaderOrientation()
+            }
+        }
+
         lifecycleScope.launch {
             delay(200)
             fadeInTextLiveData.postValue(true)
@@ -473,6 +618,12 @@ class ReaderActivity : BaseActivity() {
     }
 
     private fun hardRefreshReaderListWithFlicker() {
+        if (isHorizontalMode()) {
+            recalculatePages()
+            readerPageAdapter.notifyDataSetChanged()
+            return
+        }
+
         val readerView = viewBind.readerView
         val layoutManager = readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
         val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
@@ -496,6 +647,19 @@ class ReaderActivity : BaseActivity() {
     }
 
     private fun scrollToReadingPositionOptional(chapterIndex: Int, chapterItemPosition: Int) {
+        if (isHorizontalMode()) {
+            val itemIndex = indexOfReaderItem(
+                list = viewModel.items,
+                chapterIndex = chapterIndex,
+                chapterItemPosition = chapterItemPosition
+            )
+            if (itemIndex != -1) {
+                val pageIndex = findPageForItemIndex(itemIndex)
+                viewBind.readerPager.setCurrentItem(pageIndex, true)
+            }
+            return
+        }
+
         // If user already scrolling ignore
         if (listIsScrolling) {
             readerAdapter.notifyDataSetChanged()
@@ -534,12 +698,18 @@ class ReaderActivity : BaseActivity() {
             chapterItemPosition = chapterItemPosition
         )
         if (itemIndex == -1) return
-        val itemPosition = readerAdapter.fromIndexToPosition(itemIndex)
-        val newOffsetPx = 200.dpToPx(this@ReaderActivity)
-        readerAdapter.notifyDataSetChanged()
-        val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
-        layoutManager.smoothScrollToPositionWithOffset(itemPosition, newOffsetPx, 500)
-        readerAdapter.notifyDataSetChanged()
+
+        if (isHorizontalMode()) {
+            val pageIndex = findPageForItemIndex(itemIndex)
+            viewBind.readerPager.setCurrentItem(pageIndex, true)
+        } else {
+            val itemPosition = readerAdapter.fromIndexToPosition(itemIndex)
+            val newOffsetPx = 200.dpToPx(this@ReaderActivity)
+            readerAdapter.notifyDataSetChanged()
+            val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
+            layoutManager.smoothScrollToPositionWithOffset(itemPosition, newOffsetPx, 500)
+            readerAdapter.notifyDataSetChanged()
+        }
     }
 
     private fun scrollToReadingPositionImmediately(chapterIndex: Int, chapterItemPosition: Int) {
@@ -550,12 +720,18 @@ class ReaderActivity : BaseActivity() {
             chapterItemPosition = chapterItemPosition
         )
         if (itemIndex == -1) return
-        val itemPosition = readerAdapter.fromIndexToPosition(itemIndex)
-        val newOffsetPx = 200.dpToPx(this@ReaderActivity)
-        readerAdapter.notifyDataSetChanged()
-        val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
-        layoutManager.scrollToPositionWithOffset(itemPosition, newOffsetPx)
-        readerAdapter.notifyDataSetChanged()
+
+        if (isHorizontalMode()) {
+            val pageIndex = findPageForItemIndex(itemIndex)
+            viewBind.readerPager.setCurrentItem(pageIndex, false)
+        } else {
+            val itemPosition = readerAdapter.fromIndexToPosition(itemIndex)
+            val newOffsetPx = 200.dpToPx(this@ReaderActivity)
+            readerAdapter.notifyDataSetChanged()
+            val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
+            layoutManager.scrollToPositionWithOffset(itemPosition, newOffsetPx)
+            readerAdapter.notifyDataSetChanged()
+        }
     }
 
     private fun updateReadingState() {
@@ -611,12 +787,15 @@ class ReaderActivity : BaseActivity() {
     }
 
     override fun onPause() {
-        val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
-        updateCurrentReadingPosSavingState(
-            firstVisibleItemIndex = readerAdapter.fromPositionToIndex(
-                layoutManager.findFirstVisibleItemPosition()
-            )
-        )
+        val firstVisibleItemIndex = if (isHorizontalMode()) {
+            val currentPageIndex = viewBind.readerPager.currentItem
+            pages.getOrNull(currentPageIndex)?.firstItemIndex ?: 0
+        } else {
+            val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
+            readerAdapter.fromPositionToIndex(layoutManager.findFirstVisibleItemPosition())
+        }
+
+        updateCurrentReadingPosSavingState(firstVisibleItemIndex = firstVisibleItemIndex)
         // Explicitly save to database when app pauses
         viewModel.saveCurrentReadingPosition()
         super.onPause()

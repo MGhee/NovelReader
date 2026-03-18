@@ -22,7 +22,7 @@ internal fun LibraryScreenBody(
     topAppBarState: TopAppBarState,
     onBookClick: (BookWithContext) -> Unit,
     onBookMenuClick: (BookWithContext) -> Unit,
-    viewModel: LibraryPageViewModel = viewModel()
+    viewModel: LibraryViewModel = viewModel()
 ) {
     val pullRefreshState = rememberPullRefreshState(
         refreshing = viewModel.isPullRefreshing,
@@ -39,7 +39,8 @@ internal fun LibraryScreenBody(
         LibraryPageBody(
             list = viewModel.list,
             onClick = onBookClick,
-            onMenuClick = onBookMenuClick
+            onMenuClick = onBookMenuClick,
+            downloadProgress = viewModel.downloadProgress
         )
         PullRefreshIndicator(
             refreshing = viewModel.isPullRefreshing,

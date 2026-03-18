@@ -16,9 +16,16 @@
 		android:hapticFeedbackEnabled="false"
 		android:longClickable="false"
 		android:scrollbars="none"
-		android:visibility="invisible"
+		android:visibility="visible"
 		tools:visibility="visible"
 		tools:listitem="@layout/activity_reader_list_item_body"
+		/>
+
+	<androidx.viewpager2.widget.ViewPager2
+		android:id="@+id/readerPager"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:visibility="gone"
 		/>
 
 	<androidx.compose.ui.platform.ComposeView
