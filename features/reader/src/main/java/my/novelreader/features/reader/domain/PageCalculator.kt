@@ -22,6 +22,8 @@ internal class PageCalculator(
     private val ctx: Context,
     private val binder: ReaderItemBinder,
 ) {
+    // Cache measured heights to avoid re-inflating views on subsequent calculatePages calls
+    private val heightCache = HashMap<ReaderItem, Int>(256)
 
     /**
      * Groups items into pages based on available height.
@@ -36,8 +38,12 @@ internal class PageCalculator(
         var currentPageHeight = 0
         var firstItemIndexOnPage = 0
 
-        // Use 90% of available height to ensure content doesn't overflow
-        val maxPageHeight = (availableHeight * 0.9).toInt()
+        // Small fixed bottom padding for breathing room (8dp)
+        val bottomPadding = (8 * ctx.resources.displayMetrics.density).toInt()
+        val maxPageHeight = availableHeight - bottomPadding
+
+        // Track chapter boundaries
+        var lastChapterIndex: Int? = null
 
         // Measurement container for off-screen layout
         val measureContainer = FrameLayout(ctx).apply {
@@ -48,22 +54,37 @@ internal class PageCalculator(
         }
 
         for ((index, item) in items.withIndex()) {
+            // Skip padding items in horizontal mode (they're for vertical scroll spacing)
+            if (item is ReaderItem.Padding) continue
+
             val viewType = getItemViewType(item)
-            val measuredHeight = measureItemHeight(measureContainer, viewType, item)
+            val measuredHeight = heightCache.getOrPut(item) {
+                measureItemHeight(measureContainer, viewType, item)
+            }
 
-            // Add some buffer to measured height to account for measurement inaccuracies
-            val bufferedHeight = (measuredHeight * 1.05).toInt()
-
-            // If this item doesn't fit on the current page, start a new page
-            if (currentPageItems.isNotEmpty() && currentPageHeight + bufferedHeight > maxPageHeight) {
+            // Force page break at chapter boundary
+            val isChapterBoundary = lastChapterIndex != null && item.chapterIndex != lastChapterIndex
+            if (isChapterBoundary && currentPageItems.isNotEmpty()) {
                 pages.add(PageData(currentPageItems.toList(), firstItemIndexOnPage))
                 currentPageItems.clear()
                 currentPageHeight = 0
-                firstItemIndexOnPage = index
             }
 
+            // If this item doesn't fit on the current page, move it to the next page
+            if (currentPageItems.isNotEmpty() && currentPageHeight + measuredHeight > maxPageHeight) {
+                pages.add(PageData(currentPageItems.toList(), firstItemIndexOnPage))
+                currentPageItems.clear()
+                currentPageHeight = 0
+            }
+
+            if (currentPageItems.isEmpty()) {
+                firstItemIndexOnPage = index
+            }
             currentPageItems.add(item)
-            currentPageHeight += bufferedHeight
+            currentPageHeight += measuredHeight
+
+            // Update chapter tracking
+            lastChapterIndex = item.chapterIndex
         }
 
         // Don't forget the last page
@@ -89,6 +110,13 @@ internal class PageCalculator(
 
         view.measure(widthSpec, heightSpec)
         return view.measuredHeight
+    }
+
+    /**
+     * Clears the height cache. Call when text styling changes (font size, margins, etc.)
+     */
+    fun clearCache() {
+        heightCache.clear()
     }
 
     /**

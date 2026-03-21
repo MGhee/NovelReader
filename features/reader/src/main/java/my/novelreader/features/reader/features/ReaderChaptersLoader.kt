@@ -51,7 +51,6 @@ internal class ReaderChaptersLoader(
      * Clear all translation caches (used when refreshing translations)
      */
     fun clearTranslationCache() {
-        android.util.Log.d("ReaderChaptersLoader", "clearTranslationCache: clearing ${preTranslatedChapters.size} pre-translated chapters")
         preTranslatedChapters.clear()
         preTranslatingChapters.clear()
     }
@@ -183,18 +182,10 @@ internal class ReaderChaptersLoader(
         val nextChapter = orderedChapters[nextIndex]
         
         // Already cached or currently translating - skip
-        if (preTranslatedChapters.containsKey(nextChapter.url)) {
-            android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Chapter ${nextChapter.title} already cached")
-            return
-        }
-        if (preTranslatingChapters.contains(nextChapter.url)) {
-            android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Chapter ${nextChapter.title} already in progress")
-            return
-        }
-        
-        // Mark as translating
+        if (preTranslatedChapters.containsKey(nextChapter.url)) return
+        if (preTranslatingChapters.contains(nextChapter.url)) return
+
         preTranslatingChapters.add(nextChapter.url)
-        android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Starting for chapter ${nextChapter.title}")
         
         launch(Dispatchers.IO) {
             try {
@@ -211,10 +202,8 @@ internal class ReaderChaptersLoader(
                         .map { it.text }
                     
                     if (textsToTranslate.isNotEmpty()) {
-                        android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Translating ${textsToTranslate.size} paragraphs")
                         val translations = batchTranslator.invoke(textsToTranslate)
-                        
-                        // Save to database for persistence across sessions
+
                         val sourceLang = translatorSourceLanguageOrNull() ?: "en"
                         val targetLang = translatorTargetLanguageOrNull() ?: "zh"
                         val translationEntities = translations.map { (original, translated) ->
@@ -227,15 +216,11 @@ internal class ReaderChaptersLoader(
                             )
                         }
                         chapterTranslationDao.insertReplace(translationEntities)
-                        android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Saved ${translationEntities.size} translations to database")
-                        
-                        // Also keep in memory cache for immediate use
+
                         preTranslatedChapters[nextChapter.url] = translations
-                        android.util.Log.d("ReaderChaptersLoader", "Pre-translation: Completed, cached ${translations.size} translations")
                     }
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("ReaderChaptersLoader", "Pre-translation: Failed - ${e.message}")
+            } catch (_: Exception) {
             } finally {
                 preTranslatingChapters.remove(nextChapter.url)
             }
@@ -517,11 +502,11 @@ internal class ReaderChaptersLoader(
         maintainPosition: suspend (suspend () -> Unit) -> Unit = { it() },
     ) = withContext(Dispatchers.Default) {
         val chapter = orderedChapters[chapterIndex]
-        val itemProgressBar = ReaderItem.Progressbar(chapterIndex = chapterIndex)
+        val itemProgressBar = ReaderItem.Progressbar(chapterIndex = chapter.position)
         var chapterItemPosition = 0
         val itemTitle = ReaderItem.Title(
             chapterUrl = chapter.url,
-            chapterIndex = chapterIndex,
+            chapterIndex = chapter.position,
             text = chapter.title,
             chapterItemPosition = chapterItemPosition,
         ).copy(
@@ -530,7 +515,7 @@ internal class ReaderChaptersLoader(
         chapterItemPosition += 1
 
         maintainPosition {
-            insert(ReaderItem.Divider(chapterIndex = chapterIndex))
+            insert(ReaderItem.Divider(chapterIndex = chapter.position))
             insert(itemTitle)
             insert(itemProgressBar)
             readerViewHandlersActions.doForceUpdateListViewState()
@@ -541,7 +526,7 @@ internal class ReaderChaptersLoader(
                 // Split chapter text into items
                 var itemsOriginal = textToItemsConverter(
                     chapterUrl = chapter.url,
-                    chapterIndex = chapterIndex,
+                    chapterIndex = chapter.position,
                     chapterItemPositionDisplacement = chapterItemPosition,
                     text = res.data,
                 )
@@ -551,14 +536,14 @@ internal class ReaderChaptersLoader(
 
                 val itemTranslationAttribution = if (translatorIsActive()) {
                     ReaderItem.TranslateAttribution(
-                        chapterIndex = chapterIndex,
+                        chapterIndex = chapter.position,
                         provider = translatorProvider()
                     )
                 } else null
 
                 val itemTranslating = if (translatorIsActive()) {
                     ReaderItem.Translating(
-                        chapterIndex = chapterIndex,
+                        chapterIndex = chapter.position,
                         sourceLang = translatorSourceLanguageOrNull() ?: "",
                         targetLang = translatorTargetLanguageOrNull() ?: "",
                     )
@@ -582,8 +567,7 @@ internal class ReaderChaptersLoader(
                             // 1. Check memory cache first
                             val memCachedTranslations = preTranslatedChapters[chapter.url]
                             if (memCachedTranslations != null) {
-                                android.util.Log.d("ReaderChaptersLoader", "Using MEMORY CACHE for chapter ${chapter.title} (${memCachedTranslations.size} translations)")
-                                preTranslatedChapters.remove(chapter.url) // Clear after use
+                                preTranslatedChapters.remove(chapter.url)
                                 
                                 itemsOriginal.map {
                                     if (it is ReaderItem.Body) {
@@ -601,8 +585,6 @@ internal class ReaderChaptersLoader(
                                 }
                                 
                                 if (dbTranslations.isNotEmpty()) {
-                                    android.util.Log.d("ReaderChaptersLoader", "Using DATABASE CACHE for chapter ${chapter.title} (${dbTranslations.size} translations)")
-                                    
                                     itemsOriginal.map {
                                         if (it is ReaderItem.Body) {
                                             it.copy(textTranslated = dbTranslations[it.text] ?: it.text)
@@ -612,9 +594,7 @@ internal class ReaderChaptersLoader(
                                     // 3. Not cached anywhere - translate now and save to DB
                                     val textsToTranslate = itemsOriginal.filterIsInstance<ReaderItem.Body>()
                                         .map { it.text }
-                                    
-                                    android.util.Log.d("ReaderChaptersLoader", "Translating and caching ${textsToTranslate.size} paragraphs for chapter ${chapter.title}")
-                                    
+
                                     if (textsToTranslate.isNotEmpty()) {
                                         val translations = batchTranslator.invoke(textsToTranslate)
                                         
@@ -630,7 +610,6 @@ internal class ReaderChaptersLoader(
                                                 )
                                             }
                                             chapterTranslationDao.insertReplace(translationEntities)
-                                            android.util.Log.d("ReaderChaptersLoader", "Saved ${translationEntities.size} translations to database")
                                         }
                                         
                                         itemsOriginal.map {
@@ -644,8 +623,6 @@ internal class ReaderChaptersLoader(
                                 }
                             }
                         } else {
-                            // Fallback to paragraph-by-paragraph translation
-                            android.util.Log.d("ReaderChaptersLoader", "Using PARAGRAPH-BY-PARAGRAPH translation (batch translator not available)")
                             itemsOriginal.map {
                                 if (it is ReaderItem.Body) {
                                     it.copy(textTranslated = translatorTranslateOrNull(it.text))
@@ -673,7 +650,7 @@ internal class ReaderChaptersLoader(
                         insert(it)
                     }
                     insertAll(items)
-                    insert(ReaderItem.Divider(chapterIndex = chapterIndex))
+                    insert(ReaderItem.Divider(chapterIndex = chapter.position))
                     readerViewHandlersActions.doForceUpdateListViewState()
                 }
                 withContext(Dispatchers.Main.immediate) {
@@ -690,7 +667,7 @@ internal class ReaderChaptersLoader(
                 }
                 maintainPosition {
                     remove(itemProgressBar)
-                    insert(ReaderItem.Error(chapterIndex = chapterIndex, text = res.message))
+                    insert(ReaderItem.Error(chapterIndex = chapter.position, text = res.message))
                     readerViewHandlersActions.doForceUpdateListViewState()
                 }
                 withContext(Dispatchers.Main.immediate) {

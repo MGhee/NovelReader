@@ -26,12 +26,14 @@ import androidx.lifecycle.distinctUntilChanged
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import my.novelreader.coreui.BaseActivity
@@ -44,6 +46,7 @@ import my.novelreader.core.utils.Extra_String
 import my.novelreader.core.utils.dpToPx
 import my.novelreader.core.utils.fadeIn
 import my.novelreader.core.appPreferences.ReaderOrientation
+import my.novelreader.features.reader.domain.ChapterLoaded
 import my.novelreader.features.reader.domain.ChapterState
 import my.novelreader.features.reader.domain.PageCalculator
 import my.novelreader.features.reader.domain.PageData
@@ -101,6 +104,12 @@ class ReaderActivity : BaseActivity() {
 
     // Pages for horizontal mode
     private val pages = mutableListOf<PageData>()
+    private var pageCalculationJob: Job? = null
+    private var isLoadingNewChapter = false
+    // Map of item index in viewModel.items -> page index in pages list
+    private val itemIndexToPageIndex = mutableMapOf<Int, Int>()
+    // Generation ID to prevent stale page calculations from overwriting newer ones
+    private var pageCalculationGeneration = 0
 
     private val readerAdapter by lazy {
         ReaderItemAdapter(
@@ -169,28 +178,16 @@ class ReaderActivity : BaseActivity() {
 
     private fun applyReaderOrientation() {
         if (isHorizontalMode()) {
-            if (viewBind.readerView.visibility == android.view.View.VISIBLE) {
-                // Switching from vertical to horizontal - get current position from RecyclerView
-                val currentItemIndex = getCurrentItemIndexFromRecyclerView()
+            val currentItemIndex = when {
+                viewBind.readerPager.visibility == android.view.View.VISIBLE -> getCurrentItemIndexFromPager()
+                viewBind.readerView.visibility == android.view.View.VISIBLE -> getCurrentItemIndexFromRecyclerView()
+                else -> 0
+            }
 
-                // Hide RecyclerView
-                viewBind.readerView.visibility = android.view.View.GONE
-
-                // Recalculate pages - this runs on background thread
-                recalculatePages()
-
-                // After a short delay, show ViewPager2 (pages should be ready by then)
-                lifecycleScope.launch {
-                    delay(150)
-                    viewBind.readerPager.visibility = android.view.View.VISIBLE
-                    val pageIndex = findPageForItemIndex(currentItemIndex)
-                    if (pages.isNotEmpty()) {
-                        viewBind.readerPager.setCurrentItem(pageIndex, false)
-                    }
+            viewBind.readerPager.doOnNextLayout {
+                if (isHorizontalMode()) {
+                    recalculatePages(scrollToItemIndex = currentItemIndex)
                 }
-            } else {
-                // Already in horizontal mode, just ensure ViewPager2 is visible
-                viewBind.readerPager.visibility = android.view.View.VISIBLE
             }
         } else {
             // Switching from horizontal to vertical
@@ -200,8 +197,6 @@ class ReaderActivity : BaseActivity() {
                 getCurrentItemIndexFromRecyclerView()
             }
 
-            viewBind.readerPager.visibility = android.view.View.GONE
-            viewBind.readerView.visibility = android.view.View.VISIBLE
             val position = readerAdapter.fromIndexToPosition(currentItemIndex)
             if (position >= 0) {
                 viewBind.readerView.layoutManager?.scrollToPosition(position)
@@ -210,32 +205,59 @@ class ReaderActivity : BaseActivity() {
         }
     }
 
-    private fun recalculatePages() {
-        lifecycleScope.launch(Dispatchers.Default) {
-            pages.clear()
+    private fun recalculatePages(scrollToItemIndex: Int = -1) {
+        // Don't let background recalculations override an active button navigation
+        if (isLoadingNewChapter) return
 
-            // Try multiple sources for available height
-            val availableHeight = when {
-                viewBind.readerPager.height > 0 -> viewBind.readerPager.height
-                viewBind.readerView.height > 0 -> viewBind.readerView.height
-                else -> {
-                    // If not laid out yet, use window height minus status/navigation bars
-                    val displayMetrics = resources.displayMetrics
-                    (displayMetrics.heightPixels * 0.85).toInt() // Rough estimate
+        pageCalculationJob?.cancel()
+
+        // Always use full screen height for consistency
+        val availableHeight = resources.displayMetrics.heightPixels
+
+        if (availableHeight <= 100 || viewModel.items.isEmpty()) return
+
+        // Increment generation to invalidate stale calculations
+        pageCalculationGeneration++
+        val currentGeneration = pageCalculationGeneration
+
+        // Must run on Main thread because calculatePages inflates and measures views
+        pageCalculationJob = lifecycleScope.launch(Dispatchers.Main) {
+            // Skip if a newer calculation was queued
+            if (currentGeneration != pageCalculationGeneration) return@launch
+
+            val calculatedPages = pageCalculator.calculatePages(viewModel.items, availableHeight)
+
+            // Skip if another calculation started while we were computing
+            if (currentGeneration != pageCalculationGeneration) return@launch
+
+            // Always clear and rebuild from scratch
+            pages.clear()
+            itemIndexToPageIndex.clear()
+            pages.addAll(calculatedPages)
+
+            // Build index mapping: item index -> page index
+            // Use identity (===) to avoid data class equals matching the wrong instance
+            for ((pageIndex, page) in pages.withIndex()) {
+                for (item in page.items) {
+                    val itemIndex = viewModel.items.indexOfFirst { it === item }
+                    if (itemIndex >= 0) {
+                        itemIndexToPageIndex[itemIndex] = pageIndex
+                    }
                 }
             }
 
-            android.util.Log.d("ReaderActivity", "recalculatePages: availableHeight=$availableHeight, itemCount=${viewModel.items.size}")
+            readerPageAdapter.notifyDataSetChanged()
 
-            if (availableHeight > 100 && viewModel.items.isNotEmpty()) {
-                val calculatedPages = pageCalculator.calculatePages(viewModel.items, availableHeight)
-                withContext(Dispatchers.Main) {
-                    pages.addAll(calculatedPages)
-                    android.util.Log.d("ReaderActivity", "recalculatePages: calculated ${pages.size} pages")
-                    readerPageAdapter.notifyDataSetChanged()
+            // Always scroll to the target item, or keep current page if it's still valid
+            if (scrollToItemIndex >= 0 && pages.isNotEmpty()) {
+                val pageIndex = itemIndexToPageIndex[scrollToItemIndex] ?: findPageForItemIndex(scrollToItemIndex)
+                viewBind.readerPager.setCurrentItem(pageIndex, false)
+            } else if (pages.isNotEmpty()) {
+                // Ensure pager position is valid after page list change
+                val currentPage = viewBind.readerPager.currentItem
+                if (currentPage >= pages.size) {
+                    viewBind.readerPager.setCurrentItem(pages.size - 1, false)
                 }
-            } else {
-                android.util.Log.w("ReaderActivity", "recalculatePages: skipped - height=$availableHeight, items=${viewModel.items.size}")
             }
         }
     }
@@ -249,23 +271,19 @@ class ReaderActivity : BaseActivity() {
     private fun getCurrentItemIndexFromPager(): Int {
         if (pages.isEmpty()) return 0
         val currentPage = viewBind.readerPager.currentItem
-        return pages.getOrNull(currentPage)?.firstItemIndex ?: 0
+        val page = pages.getOrNull(currentPage) ?: return 0
+        return getFirstPositionItemIndexOnPage(page)
+    }
+
+    private fun getFirstPositionItemIndexOnPage(page: PageData): Int {
+        val posItem = page.items.firstOrNull { it is ReaderItem.Position }
+        return if (posItem != null) viewModel.items.indexOfFirst { it === posItem } else page.firstItemIndex
     }
 
     private fun findPageForItemIndex(itemIndex: Int): Int {
-        for ((pageIndex, page) in pages.withIndex()) {
-            if (itemIndex >= page.firstItemIndex && itemIndex < page.firstItemIndex + page.items.size) {
-                return pageIndex
-            }
-        }
-        return 0
+        // Use the pre-built mapping for O(1) lookup
+        return itemIndexToPageIndex[itemIndex] ?: 0
     }
-
-    override fun onBackPressed() {
-        viewModel.onCloseManually()
-        super.onBackPressed()
-    }
-
 
     override fun onDestroy() {
         readerViewHandlersActions.invalidate()
@@ -275,23 +293,62 @@ class ReaderActivity : BaseActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Handle back button press using OnBackPressedDispatcher
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                viewModel.onCloseManually()
+                finish()
+            }
+        })
+
+        // Set initial view visibility based on saved orientation IMMEDIATELY after onCreate
+        // This must happen before any other setup to prevent overlapping views
+        viewBind.readerView.visibility = android.view.View.GONE
+        viewBind.readerPager.visibility = android.view.View.GONE
+        viewBind.root.requestLayout()
+
+        if (appPreferences.READER_ORIENTATION.value == ReaderOrientation.Horizontal) {
+            viewBind.readerPager.visibility = android.view.View.VISIBLE
+        } else {
+            viewBind.readerView.visibility = android.view.View.VISIBLE
+        }
+
         viewBind.readerView.adapter = readerAdapter
 
         // Set up ViewPager2 for horizontal mode
         viewBind.readerPager.adapter = readerPageAdapter
-        viewBind.readerPager.offscreenPageLimit = 1
+        viewBind.readerPager.offscreenPageLimit = 2
         viewBind.readerPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            private var lastProcessedPosition = -1
+
             override fun onPageSelected(position: Int) {
+                // Skip if position didn't actually change (prevents duplicate processing)
+                if (position == lastProcessedPosition) return
+                lastProcessedPosition = position
+
+                // Skip callbacks while loading a new chapter to prevent snapping back
+                if (isLoadingNewChapter) return
+
+                // Also skip if we're still doing initial load
+                if (viewModel.chaptersLoader.readerState == ReaderState.INITIAL_LOAD) return
+
                 val page = pages.getOrNull(position) ?: return
-                updateCurrentReadingPosSavingState(firstVisibleItemIndex = page.firstItemIndex)
+
+                updateCurrentReadingPosSavingState(firstVisibleItemIndex = getFirstPositionItemIndexOnPage(page))
                 updateInfoView()
-                if (position >= pages.size - 2) viewModel.chaptersLoader.tryLoadNext()
-                if (position <= 1) viewModel.chaptersLoader.tryLoadPrevious()
+
+                // Auto-load adjacent chapters for continuous scrolling
+                // Only load when at the absolute last/first page (not 2 pages before) to reduce snap-back
+                if (viewModel.chaptersLoader.readerState == ReaderState.IDLE) {
+                    if (position == pages.size - 1) viewModel.chaptersLoader.tryLoadNext()
+                    if (position == 0) viewModel.chaptersLoader.tryLoadPrevious()
+                }
             }
         })
 
         fadeInTextLiveData.distinctUntilChanged().observe(this) {
-            if (it) {
+            if (it && !isHorizontalMode()) {
                 viewBind.readerView.fadeIn(durationMillis = 150)
             }
         }
@@ -299,6 +356,35 @@ class ReaderActivity : BaseActivity() {
         lifecycleScope.launch {
             viewModel.onTranslatorChanged.collect {
                 viewModel.reloadReader()
+            }
+        }
+
+        // Apply saved reader orientation after initial chapter loads
+        lifecycleScope.launch {
+            viewModel.chaptersLoader.chapterLoadedFlow.collect { loaded ->
+                if (loaded.type == ChapterLoaded.Type.Initial) {
+                    // Ensure correct view visibility based on current mode
+                    if (appPreferences.READER_ORIENTATION.value == ReaderOrientation.Horizontal) {
+                        viewBind.readerView.visibility = android.view.View.GONE
+                        viewBind.readerPager.visibility = android.view.View.VISIBLE
+                    } else {
+                        viewBind.readerPager.visibility = android.view.View.GONE
+                        viewBind.readerView.visibility = android.view.View.VISIBLE
+                    }
+                    applyReaderOrientation()
+                }
+            }
+        }
+
+        // Recalculate pages after Next chapter loads in horizontal mode.
+        // Initial loads are handled by setInitialPosition. Previous chapter loads
+        // are handled by maintainLastVisiblePosition. Only Next chapter loads use the
+        // default maintainPosition (no-op) and need this observer for recalculation.
+        lifecycleScope.launch {
+            viewModel.chaptersLoader.chapterLoadedFlow.collect { loaded ->
+                if (isHorizontalMode() && loaded.type == ChapterLoaded.Type.Next) {
+                    recalculatePages(scrollToItemIndex = getCurrentItemIndexFromPager())
+                }
             }
         }
 
@@ -324,42 +410,151 @@ class ReaderActivity : BaseActivity() {
 
         readerViewHandlersActions.forceUpdateListViewState = {
             withContext(Dispatchers.Main.immediate) {
-                readerAdapter.notifyDataSetChanged()
+                if (isHorizontalMode()) {
+                    // Only clear pages when items are empty (e.g., during reload/initial load).
+                    // Incremental page recalculation is handled by position maintenance
+                    // handlers and the chapterLoadedFlow observer.
+                    if (viewModel.items.isEmpty()) {
+                        pages.clear()
+                        itemIndexToPageIndex.clear()
+                        readerPageAdapter.notifyDataSetChanged()
+                    }
+                } else {
+                    readerAdapter.notifyDataSetChanged()
+                }
             }
         }
 
         readerViewHandlersActions.maintainStartPosition = {
             withContext(Dispatchers.Main.immediate) {
+                // Capture current item by object reference BEFORE items are prepended
+                val currentItem = if (isHorizontalMode()) {
+                    val currentPage = viewBind.readerPager.currentItem
+                    pages.getOrNull(currentPage)?.items?.firstOrNull()
+                } else null
                 it()
-                val titleIndex = (0..readerAdapter.count)
-                    .indexOfFirst { readerAdapter.getItem(it) is ReaderItem.Title }
+                if (isHorizontalMode()) {
+                    // Find item's NEW index after prepending shifted all indices
+                    // Use identity (===) to avoid data class equals matching the wrong instance
+                    val newIndex = currentItem?.let { item -> viewModel.items.indexOfFirst { it === item } } ?: -1
+                    recalculatePages(scrollToItemIndex = newIndex)
+                } else {
+                    val titleIndex = (0..readerAdapter.count)
+                        .indexOfFirst { readerAdapter.getItem(it) is ReaderItem.Title }
 
-                if (titleIndex != -1) {
-                    viewBind.readerView.scrollToPosition(titleIndex)
+                    if (titleIndex != -1) {
+                        viewBind.readerView.scrollToPosition(titleIndex)
+                    }
                 }
             }
         }
 
         readerViewHandlersActions.setInitialPosition = {
             withContext(Dispatchers.Main.immediate) {
+                isLoadingNewChapter = true
                 initialScrollToChapterItemPosition(
                     chapterIndex = it.chapterIndex,
                     chapterItemPosition = it.chapterItemPosition,
                     offset = it.chapterItemOffset
                 )
+                if (isHorizontalMode()) {
+                    // Invalidate any pending page calculations
+                    pageCalculationGeneration++
+                    val currentGen = pageCalculationGeneration
+                    val targetChapterIndex = it.chapterIndex
+                    val targetChapterItemPosition = it.chapterItemPosition
+
+                    val availableHeight = resources.displayMetrics.heightPixels
+                    if (availableHeight > 100 && viewModel.items.isNotEmpty()) {
+                        val calculatedPages = pageCalculator.calculatePages(viewModel.items, availableHeight)
+                        if (currentGen != pageCalculationGeneration) {
+                            isLoadingNewChapter = false
+                            return@withContext
+                        }
+
+                        // Find the page containing the target position
+                        var targetPageIndex = 0
+                        if (targetChapterItemPosition > 0) {
+                            // Restore to the page containing the saved item position
+                            for ((pageIndex, page) in calculatedPages.withIndex()) {
+                                if (page.items.any { item ->
+                                    item is ReaderItem.Position &&
+                                    item.chapterIndex == targetChapterIndex &&
+                                    item.chapterItemPosition == targetChapterItemPosition
+                                }) {
+                                    targetPageIndex = pageIndex
+                                    break
+                                }
+                            }
+                        } else {
+                            // Position 0 = title page (default for explicit navigation)
+                            for ((pageIndex, page) in calculatedPages.withIndex()) {
+                                if (page.items.any { item ->
+                                    item is ReaderItem.Title && item.chapterIndex == targetChapterIndex
+                                }) {
+                                    targetPageIndex = pageIndex
+                                    break
+                                }
+                            }
+                        }
+
+                        // Clear and set pages atomically
+                        pages.clear()
+                        itemIndexToPageIndex.clear()
+                        pages.addAll(calculatedPages)
+
+                        // Build index mapping (use === to avoid data class equals collisions)
+                        for ((pageIndex, page) in calculatedPages.withIndex()) {
+                            for (item in page.items) {
+                                val itemIndex = viewModel.items.indexOfFirst { it === item }
+                                if (itemIndex >= 0) {
+                                    itemIndexToPageIndex[itemIndex] = pageIndex
+                                }
+                            }
+                        }
+
+                        readerPageAdapter.notifyDataSetChanged()
+                        viewBind.readerPager.setCurrentItem(targetPageIndex, false)
+
+                        isLoadingNewChapter = false
+                        updateInfoView()
+
+                        // If restoring to a title page, load previous chapter on demand
+                        // so user can swipe left. Use post() to defer until pager is stable
+                        if (targetChapterItemPosition == 0) {
+                            viewBind.readerPager.post {
+                                viewModel.chaptersLoader.tryLoadPrevious()
+                            }
+                        }
+                    } else {
+                        isLoadingNewChapter = false
+                    }
+                } else {
+                    isLoadingNewChapter = false
+                }
             }
         }
 
         readerViewHandlersActions.maintainLastVisiblePosition = {
             withContext(Dispatchers.Main.immediate) {
-                val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
-                val oldSize = readerAdapter.itemCount
-                val position = layoutManager.findLastVisibleItemPosition()
-                val view = layoutManager.findViewByPosition(position)
-                val top = view?.top?.minus(view.paddingTop) ?: 0
-                it()
-                val displacement = readerAdapter.itemCount - oldSize
-                layoutManager.scrollToPositionWithOffset(position + displacement, top)
+                if (isHorizontalMode()) {
+                    // Capture current item by object reference BEFORE items are modified
+                    val currentItem = pages.getOrNull(viewBind.readerPager.currentItem)?.items?.firstOrNull()
+                    it()
+                    // Find item's NEW index after items are prepended/appended
+                    // Use identity (===) to avoid data class equals matching the wrong instance
+                    val newIndex = currentItem?.let { item -> viewModel.items.indexOfFirst { it === item } } ?: -1
+                    recalculatePages(scrollToItemIndex = newIndex)
+                } else {
+                    val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
+                    val oldSize = readerAdapter.itemCount
+                    val position = layoutManager.findLastVisibleItemPosition()
+                    val view = layoutManager.findViewByPosition(position)
+                    val top = view?.top?.minus(view.paddingTop) ?: 0
+                    it()
+                    val displacement = readerAdapter.itemCount - oldSize
+                    layoutManager.scrollToPositionWithOffset(position + displacement, top)
+                }
             }
         }
 
@@ -471,8 +666,14 @@ class ReaderActivity : BaseActivity() {
                     },
                     onOpenChapter = viewModel::openChapterFromList,
                     onDownloadChapter = viewModel::downloadChapterFromList,
-                    onNavigateToNextChapter = viewModel::navigateToNextChapter,
-                    onNavigateToPreviousChapter = viewModel::navigateToPreviousChapter,
+                    onNavigateToNextChapter = {
+                        if (isHorizontalMode()) navigateToNextChapterHorizontal()
+                        else viewModel.navigateToNextChapter()
+                    },
+                    onNavigateToPreviousChapter = {
+                        if (isHorizontalMode()) navigateToPreviousChapterHorizontal()
+                        else viewModel.navigateToPreviousChapter()
+                    },
                     onOpenChaptersList = {
                         viewModel.state.showChapterList.value = true
                     },
@@ -523,19 +724,6 @@ class ReaderActivity : BaseActivity() {
 
 
         readerAdapter.notifyDataSetChanged()
-
-        // Apply saved orientation after data is fully loaded
-        lifecycleScope.launch {
-            var attempts = 0
-            while (attempts < 20 && viewModel.items.isEmpty()) {
-                delay(50)
-                attempts++
-            }
-            // Now data should be loaded, apply orientation
-            if (isHorizontalMode() && viewModel.items.isNotEmpty()) {
-                applyReaderOrientation()
-            }
-        }
 
         lifecycleScope.launch {
             delay(200)
@@ -613,14 +801,19 @@ class ReaderActivity : BaseActivity() {
     }
 
     private fun refreshReaderListLayout() {
+        if (isHorizontalMode()) {
+            pageCalculator.clearCache()
+            recalculatePages(scrollToItemIndex = getCurrentItemIndexFromPager())
+            return
+        }
         readerAdapter.notifyDataSetChanged()
         viewBind.readerView.requestLayout()
     }
 
     private fun hardRefreshReaderListWithFlicker() {
         if (isHorizontalMode()) {
-            recalculatePages()
-            readerPageAdapter.notifyDataSetChanged()
+            pageCalculator.clearCache()
+            recalculatePages(scrollToItemIndex = getCurrentItemIndexFromPager())
             return
         }
 
@@ -644,6 +837,127 @@ class ReaderActivity : BaseActivity() {
             .alpha(1f)
             .setDuration(120)
             .start()
+    }
+
+    /**
+     * Synchronously recalculates pages and scrolls to a chapter's title page.
+     * Runs entirely on the main thread without launching coroutines, so it cannot be
+     * cancelled or overridden by concurrent page recalculations from background chapter loads.
+     */
+    private fun recalculatePagesAndScrollToChapter(chapterUrl: String, chapterIndex: Int) {
+        isLoadingNewChapter = true
+
+        // Cancel any pending async page calculations to prevent them from overriding us later
+        pageCalculationJob?.cancel()
+        pageCalculationGeneration++
+
+        val availableHeight = resources.displayMetrics.heightPixels
+        if (availableHeight <= 100 || viewModel.items.isEmpty()) {
+            isLoadingNewChapter = false
+            return
+        }
+
+        val calculatedPages = pageCalculator.calculatePages(viewModel.items, availableHeight)
+
+        // Find the title page for the target chapter
+        var titlePageIndex = 0
+        for ((pageIndex, page) in calculatedPages.withIndex()) {
+            if (page.items.any { it is ReaderItem.Title && it.chapterIndex == chapterIndex }) {
+                titlePageIndex = pageIndex
+                break
+            }
+        }
+
+        // Update pages atomically
+        pages.clear()
+        itemIndexToPageIndex.clear()
+        pages.addAll(calculatedPages)
+        for ((pageIndex, page) in calculatedPages.withIndex()) {
+            for (item in page.items) {
+                val itemIndex = viewModel.items.indexOfFirst { it === item }
+                if (itemIndex >= 0) {
+                    itemIndexToPageIndex[itemIndex] = pageIndex
+                }
+            }
+        }
+
+        readerPageAdapter.notifyDataSetChanged()
+
+        viewModel.readingCurrentChapter = ChapterState(
+            chapterUrl = chapterUrl,
+            chapterItemPosition = 0,
+            offset = 0,
+        )
+
+        viewBind.readerPager.setCurrentItem(titlePageIndex, false)
+        updateInfoView()
+
+        // Keep isLoadingNewChapter true until the pager settles after layout.
+        // This blocks any concurrent recalculations (from maintain handlers or
+        // chapterLoadedFlow) from overriding our navigation target.
+        // Then do a final recalculation to pick up any items added during navigation.
+        viewBind.readerPager.post {
+            isLoadingNewChapter = false
+            recalculatePages(scrollToItemIndex = getCurrentItemIndexFromPager())
+        }
+    }
+
+    private fun navigateToNextChapterHorizontal() {
+        val loader = viewModel.chaptersLoader
+        val currentPageData = pages.getOrNull(viewBind.readerPager.currentItem) ?: return
+        val currentChapterIndex = currentPageData.items.firstOrNull()?.chapterIndex ?: return
+        val currentIndex = loader.orderedChapters.indexOfFirst { it.position == currentChapterIndex }
+        if (currentIndex == -1 || currentIndex >= loader.orderedChapters.size - 1) return
+
+        val nextChapter = loader.orderedChapters[currentIndex + 1]
+
+        // Check if the title exists in items (covers both fully loaded and still-loading chapters)
+        val hasTitle = viewModel.items.any { it is ReaderItem.Title && it.chapterIndex == nextChapter.position }
+
+        if (hasTitle) {
+            viewModel.saveCurrentReadingPosition()
+            recalculatePagesAndScrollToChapter(nextChapter.url, nextChapter.position)
+        } else {
+            // Chapter not in items yet -- trigger background load, keep current view,
+            // then navigate once loaded (avoids the full-clear flicker of openChapterFromList)
+            viewModel.saveCurrentReadingPosition()
+            loader.tryLoadNext()
+            lifecycleScope.launch {
+                viewModel.chaptersLoader.chapterLoadedFlow
+                    .filter { it.chapterIndex == nextChapter.position }
+                    .first()
+                recalculatePagesAndScrollToChapter(nextChapter.url, nextChapter.position)
+            }
+        }
+    }
+
+    private fun navigateToPreviousChapterHorizontal() {
+        val loader = viewModel.chaptersLoader
+        val currentPageData = pages.getOrNull(viewBind.readerPager.currentItem) ?: return
+        val currentChapterIndex = currentPageData.items.firstOrNull()?.chapterIndex ?: return
+        val currentIndex = loader.orderedChapters.indexOfFirst { it.position == currentChapterIndex }
+        if (currentIndex <= 0) return
+
+        val previousChapter = loader.orderedChapters[currentIndex - 1]
+
+        // Check if the title exists in items (covers both fully loaded and still-loading chapters)
+        val hasTitle = viewModel.items.any { it is ReaderItem.Title && it.chapterIndex == previousChapter.position }
+
+        if (hasTitle) {
+            viewModel.saveCurrentReadingPosition()
+            recalculatePagesAndScrollToChapter(previousChapter.url, previousChapter.position)
+        } else {
+            // Chapter not in items yet -- trigger background load, keep current view,
+            // then navigate once loaded (avoids the full-clear flicker of openChapterFromList)
+            viewModel.saveCurrentReadingPosition()
+            loader.tryLoadPrevious()
+            lifecycleScope.launch {
+                viewModel.chaptersLoader.chapterLoadedFlow
+                    .filter { it.chapterIndex == previousChapter.position }
+                    .first()
+                recalculatePagesAndScrollToChapter(previousChapter.url, previousChapter.position)
+            }
+        }
     }
 
     private fun scrollToReadingPositionOptional(chapterIndex: Int, chapterItemPosition: Int) {
@@ -780,16 +1094,41 @@ class ReaderActivity : BaseActivity() {
     }
 
     private fun updateInfoView() {
-        val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
-        val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
-        val itemIndex = readerAdapter.fromPositionToIndex(lastVisiblePosition)
+        val itemIndex = if (isHorizontalMode()) {
+            val currentPage = viewBind.readerPager.currentItem
+            val page = pages.getOrNull(currentPage)
+            if (page != null && page.items.isNotEmpty()) {
+                getFirstPositionItemIndexOnPage(page)
+            } else 0
+        } else {
+            val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
+            val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+            readerAdapter.fromPositionToIndex(lastVisiblePosition)
+        }
         viewModel.updateInfoViewTo(itemIndex)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Ensure correct view visibility when resuming
+        // This handles re-entering the book in the same session
+        // Use a post to ensure this runs after other layout changes
+        viewBind.root.post {
+            if (appPreferences.READER_ORIENTATION.value == ReaderOrientation.Horizontal) {
+                viewBind.readerView.visibility = android.view.View.GONE
+                viewBind.readerPager.visibility = android.view.View.VISIBLE
+            } else {
+                viewBind.readerPager.visibility = android.view.View.GONE
+                viewBind.readerView.visibility = android.view.View.VISIBLE
+            }
+        }
     }
 
     override fun onPause() {
         val firstVisibleItemIndex = if (isHorizontalMode()) {
             val currentPageIndex = viewBind.readerPager.currentItem
-            pages.getOrNull(currentPageIndex)?.firstItemIndex ?: 0
+            val page = pages.getOrNull(currentPageIndex)
+            if (page != null) getFirstPositionItemIndexOnPage(page) else 0
         } else {
             val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
             readerAdapter.fromPositionToIndex(layoutManager.findFirstVisibleItemPosition())
@@ -809,10 +1148,14 @@ class ReaderActivity : BaseActivity() {
         val item = viewModel.items.getOrNull(firstVisibleItemIndex) ?: return
         if (item !is ReaderItem.Position) return
 
-        val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
-        val firstPos = layoutManager.findFirstVisibleItemPosition()
-        val view = layoutManager.findViewByPosition(firstPos)
-        val offset = view?.top?.minus(view.paddingTop) ?: 0
+        val offset = if (isHorizontalMode()) {
+            0
+        } else {
+            val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
+            val firstPos = layoutManager.findFirstVisibleItemPosition()
+            val view = layoutManager.findViewByPosition(firstPos)
+            view?.top?.minus(view.paddingTop) ?: 0
+        }
         viewModel.readingCurrentChapter = ChapterState(
             chapterUrl = item.chapterUrl,
             chapterItemPosition = item.chapterItemPosition,
