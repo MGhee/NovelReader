@@ -31,6 +31,7 @@ import my.novelreader.reader.databinding.ActivityReaderListItemSpecialTitleBindi
 import my.novelreader.reader.databinding.ActivityReaderListItemTitleBinding
 import my.novelreader.reader.databinding.ActivityReaderListItemTranslateAttributionBinding
 import my.novelreader.reader.databinding.ActivityReaderListItemTranslatingBinding
+import my.novelreader.reader.databinding.ActivityReaderListItemChapterEndSpacerBinding
 import my.novelreader.text_to_speech.Utterance
 
 internal class ReaderItemBinder(
@@ -93,6 +94,9 @@ internal class ReaderItemBinder(
             11 -> ReaderViewHolder.TranslateAttributionHolder(
                 ActivityReaderListItemTranslateAttributionBinding.inflate(inflater, parent, false)
             )
+            12 -> ReaderViewHolder.ChapterEndSpacerHolder(
+                ActivityReaderListItemChapterEndSpacerBinding.inflate(inflater, parent, false)
+            )
             else -> throw IllegalArgumentException("Unknown view type: $viewType")
         }
 
@@ -114,6 +118,7 @@ internal class ReaderItemBinder(
             is ReaderViewHolder.TranslatingHolder -> bindTranslating(holder, item as ReaderItem.Translating)
             is ReaderViewHolder.TranslateAttributionHolder -> bindTranslateAttribution(holder, item as ReaderItem.TranslateAttribution)
             is ReaderViewHolder.GoogleTranslateAttributionHolder -> {} // No binding needed
+            is ReaderViewHolder.ChapterEndSpacerHolder -> bindChapterEndSpacer(holder)
         }
     }
 
@@ -218,6 +223,13 @@ internal class ReaderItemBinder(
         bind.specialTitle.updateTextSelectability()
         bind.specialTitle.text = ctx.getString(R.string.reader_first_chapter)
         bind.specialTitle.typeface = currentTypefaceBold()
+    }
+
+    private fun bindChapterEndSpacer(holder: ReaderViewHolder.ChapterEndSpacerHolder) {
+        val screenHeight = ctx.resources.displayMetrics.heightPixels
+        holder.binding.root.updateLayoutParams {
+            height = screenHeight / 2
+        }
     }
 
     private fun bindTranslating(holder: ReaderViewHolder.TranslatingHolder, item: ReaderItem.Translating) {

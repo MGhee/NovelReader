@@ -516,6 +516,7 @@ internal class ReaderChaptersLoader(
 
         maintainPosition {
             insert(ReaderItem.Divider(chapterIndex = chapter.position))
+            insert(ReaderItem.ChapterEndSpacer(chapterIndex = chapter.position))
             insert(itemTitle)
             insert(itemProgressBar)
             readerViewHandlersActions.doForceUpdateListViewState()
@@ -530,6 +531,11 @@ internal class ReaderChaptersLoader(
                     chapterItemPositionDisplacement = chapterItemPosition,
                     text = res.data,
                 )
+                // Remove first body item if it duplicates the chapter title
+                val firstBody = itemsOriginal.firstOrNull() as? ReaderItem.Body
+                if (firstBody != null && firstBody.text.trim().equals(chapter.title.trim(), ignoreCase = true)) {
+                    itemsOriginal = itemsOriginal.drop(1)
+                }
                 // Paragraph spacing is now controlled via Body item bottom margin
                 // itemsOriginal = insertParagraphSpacing(itemsOriginal, chapterIndex)
                 chapterItemPosition += itemsOriginal.size
@@ -650,7 +656,7 @@ internal class ReaderChaptersLoader(
                         insert(it)
                     }
                     insertAll(items)
-                    insert(ReaderItem.Divider(chapterIndex = chapter.position))
+                    insert(ReaderItem.ChapterEndSpacer(chapterIndex = chapter.position))
                     readerViewHandlersActions.doForceUpdateListViewState()
                 }
                 withContext(Dispatchers.Main.immediate) {

@@ -73,5 +73,6 @@ internal sealed interface ReaderItem {
     data class BookStart(override val chapterIndex: Int) : ReaderItem
     data class Error(override val chapterIndex: Int, val text: String) : ReaderItem
     data class Padding(override val chapterIndex: Int) : ReaderItem
+    data class ChapterEndSpacer(override val chapterIndex: Int) : ReaderItem
 }
 

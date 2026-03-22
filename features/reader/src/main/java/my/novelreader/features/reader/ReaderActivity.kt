@@ -96,6 +96,8 @@ class ReaderActivity : BaseActivity() {
     internal lateinit var readerViewHandlersActions: ReaderViewHandlersActions
 
     private var listIsScrolling = false
+    private var isSnapping = false
+    private var pendingSnapToChapter: Int? = null
     private val fadeInTextLiveData = MutableLiveData(false)
 
     private val viewModel by viewModels<ReaderViewModel>()
@@ -184,6 +186,9 @@ class ReaderActivity : BaseActivity() {
                 else -> 0
             }
 
+            viewBind.readerView.visibility = android.view.View.GONE
+            viewBind.readerPager.visibility = android.view.View.VISIBLE
+
             viewBind.readerPager.doOnNextLayout {
                 if (isHorizontalMode()) {
                     recalculatePages(scrollToItemIndex = currentItemIndex)
@@ -196,6 +201,9 @@ class ReaderActivity : BaseActivity() {
             } else {
                 getCurrentItemIndexFromRecyclerView()
             }
+
+            viewBind.readerPager.visibility = android.view.View.GONE
+            viewBind.readerView.visibility = android.view.View.VISIBLE
 
             val position = readerAdapter.fromIndexToPosition(currentItemIndex)
             if (position >= 0) {
@@ -384,6 +392,10 @@ class ReaderActivity : BaseActivity() {
             viewModel.chaptersLoader.chapterLoadedFlow.collect { loaded ->
                 if (isHorizontalMode() && loaded.type == ChapterLoaded.Type.Next) {
                     recalculatePages(scrollToItemIndex = getCurrentItemIndexFromPager())
+                } else if (!isHorizontalMode() && pendingSnapToChapter == loaded.chapterIndex) {
+                    // In vertical mode: snap if a snap was pending (user scrolled to spacer but chapter wasn't loaded yet)
+                    pendingSnapToChapter = null
+                    snapToChapterTitle(loaded.chapterIndex)
                 }
             }
         }
@@ -704,10 +716,43 @@ class ReaderActivity : BaseActivity() {
                     )
                     updateInfoView()
                     updateReadingState()
+
+                    // Snap at chapter boundaries in vertical mode.
+                    // Transition zone: Content → SpacerA → Divider → SpacerB → Title
+                    // Only SpacerA (followed by Divider) triggers snap. SpacerB (followed by Title)
+                    // does NOT trigger, giving the user room to scroll back from a Title without
+                    // immediately snapping.
+                    if (!isHorizontalMode() && !isSnapping && dy != 0) {
+                        val firstItemIndex = readerAdapter.fromPositionToIndex(firstVisiblePosition)
+                        val firstItem = viewModel.items.getOrNull(firstItemIndex)
+                        val nextItem = viewModel.items.getOrNull(firstItemIndex + 1)
+                        if (firstItem is ReaderItem.ChapterEndSpacer && nextItem is ReaderItem.Divider) {
+                            if (dy > 0) {
+                                // Scrolling down: find next Title after the transition zone
+                                val titleIndex = ((firstItemIndex + 1) until viewModel.items.size).firstOrNull { idx ->
+                                    viewModel.items[idx] is ReaderItem.Title
+                                }
+                                if (titleIndex != null) {
+                                    snapToPosition(readerAdapter.fromIndexToPosition(titleIndex))
+                                } else {
+                                    pendingSnapToChapter = firstItem.chapterIndex + 1
+                                }
+                            } else {
+                                // Scrolling up: snap to last content before this spacer
+                                val contentIdx = firstItemIndex - 1
+                                if (contentIdx >= 0) {
+                                    snapToPosition(readerAdapter.fromIndexToPosition(contentIdx))
+                                }
+                            }
+                        }
+                    }
                 }
 
                 override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                     listIsScrolling = newState != RecyclerView.SCROLL_STATE_IDLE
+                    if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                        isSnapping = false
+                    }
                 }
             }
         )
@@ -800,6 +845,29 @@ class ReaderActivity : BaseActivity() {
             }
     }
 
+    private fun snapToPosition(position: Int) {
+        if (position != -1) {
+            val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
+            isSnapping = true
+            layoutManager.scrollToPositionWithOffset(position, 0)
+            viewBind.readerView.post { isSnapping = false }
+        }
+    }
+
+    private fun snapToChapterTitle(chapterIndex: Int) {
+        val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
+
+        // Find the Title item for this chapter
+        val titleIndex = viewModel.items.indexOfFirst { item ->
+            item is ReaderItem.Title && item.chapterIndex == chapterIndex
+        }
+
+        if (titleIndex != -1) {
+            val position = readerAdapter.fromIndexToPosition(titleIndex)
+            snapToPosition(position)
+        }
+    }
+
     private fun refreshReaderListLayout() {
         if (isHorizontalMode()) {
             pageCalculator.clearCache()
@@ -809,6 +877,7 @@ class ReaderActivity : BaseActivity() {
         readerAdapter.notifyDataSetChanged()
         viewBind.readerView.requestLayout()
     }
+
 
     private fun hardRefreshReaderListWithFlicker() {
         if (isHorizontalMode()) {
@@ -1101,9 +1170,21 @@ class ReaderActivity : BaseActivity() {
                 getFirstPositionItemIndexOnPage(page)
             } else 0
         } else {
+            // Use first visible Position item so spacers/dividers at the bottom
+            // of the screen don't cause the chapter info to show the wrong chapter.
             val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
-            val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
-            readerAdapter.fromPositionToIndex(lastVisiblePosition)
+            val firstPos = layoutManager.findFirstVisibleItemPosition()
+            val lastPos = layoutManager.findLastVisibleItemPosition()
+            var result = readerAdapter.fromPositionToIndex(firstPos)
+            for (pos in firstPos..lastPos) {
+                val idx = readerAdapter.fromPositionToIndex(pos)
+                val item = viewModel.items.getOrNull(idx)
+                if (item is ReaderItem.Position) {
+                    result = idx
+                    break
+                }
+            }
+            result
         }
         viewModel.updateInfoViewTo(itemIndex)
     }

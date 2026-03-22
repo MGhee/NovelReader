@@ -62,5 +62,6 @@ internal class ReaderPageAdapter(
         is ReaderItem.Translating -> 9
         is ReaderItem.GoogleTranslateAttribution -> 10
         is ReaderItem.TranslateAttribution -> 11
+        is ReaderItem.ChapterEndSpacer -> 12
     }
 }

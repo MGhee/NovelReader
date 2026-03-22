@@ -55,7 +55,7 @@ internal class PageCalculator(
 
         for ((index, item) in items.withIndex()) {
             // Skip padding items in horizontal mode (they're for vertical scroll spacing)
-            if (item is ReaderItem.Padding) continue
+            if (item is ReaderItem.Padding || item is ReaderItem.ChapterEndSpacer) continue
 
             val viewType = getItemViewType(item)
             val measuredHeight = heightCache.getOrPut(item) {
@@ -135,5 +135,6 @@ internal class PageCalculator(
         is ReaderItem.Translating -> 9
         is ReaderItem.GoogleTranslateAttribution -> 10
         is ReaderItem.TranslateAttribution -> 11
+        is ReaderItem.ChapterEndSpacer -> 12
     }
 }

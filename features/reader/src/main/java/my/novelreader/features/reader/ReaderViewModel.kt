@@ -162,7 +162,10 @@ internal class ReaderViewModel @Inject constructor(
             chapterItemPosition = 0,
             offset = 0,
         )
-        chaptersLoader.tryLoadInitial(chapterIndex = chapterIndex)
+        // Use tryLoadRestartedInitial so the position comes from readingCurrentChapter (0)
+        // directly, avoiding a race with the IO save above that could return a stale
+        // lastReadChapter from the database and restore an old position.
+        chaptersLoader.tryLoadRestartedInitial(chapterLastState = readingCurrentChapter)
     }
 
     fun downloadChapterFromList(chapterUrl: String) {

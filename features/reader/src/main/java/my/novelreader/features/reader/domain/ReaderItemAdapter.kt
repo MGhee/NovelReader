@@ -17,6 +17,7 @@ import my.novelreader.reader.databinding.ActivityReaderListItemProgressBarBindin
 import my.novelreader.reader.databinding.ActivityReaderListItemSpecialTitleBinding
 import my.novelreader.reader.databinding.ActivityReaderListItemTitleBinding
 import my.novelreader.reader.databinding.ActivityReaderListItemTranslateAttributionBinding
+import my.novelreader.reader.databinding.ActivityReaderListItemChapterEndSpacerBinding
 import my.novelreader.reader.databinding.ActivityReaderListItemTranslatingBinding
 
 internal class ReaderItemAdapter(
@@ -103,6 +104,7 @@ internal class ReaderItemAdapter(
         is ReaderItem.Translating -> 9
         is ReaderItem.GoogleTranslateAttribution -> 10
         is ReaderItem.TranslateAttribution -> 11
+        is ReaderItem.ChapterEndSpacer -> 12
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ReaderViewHolder {
@@ -142,6 +144,9 @@ internal class ReaderItemAdapter(
             )
             11 -> ReaderViewHolder.TranslateAttributionHolder(
                 ActivityReaderListItemTranslateAttributionBinding.inflate(inflater, parent, false)
+            )
+            12 -> ReaderViewHolder.ChapterEndSpacerHolder(
+                ActivityReaderListItemChapterEndSpacerBinding.inflate(inflater, parent, false)
             )
             else -> throw IllegalArgumentException("Unknown view type: $viewType")
         }

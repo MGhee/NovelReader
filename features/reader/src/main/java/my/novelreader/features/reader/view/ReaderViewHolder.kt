@@ -13,6 +13,7 @@ import my.novelreader.reader.databinding.ActivityReaderListItemSpecialTitleBindi
 import my.novelreader.reader.databinding.ActivityReaderListItemTitleBinding
 import my.novelreader.reader.databinding.ActivityReaderListItemTranslateAttributionBinding
 import my.novelreader.reader.databinding.ActivityReaderListItemTranslatingBinding
+import my.novelreader.reader.databinding.ActivityReaderListItemChapterEndSpacerBinding
 
 sealed class ReaderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     data class BodyHolder(val binding: ActivityReaderListItemBodyBinding) : ReaderViewHolder(binding.root)
@@ -27,4 +28,5 @@ sealed class ReaderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView
     data class TranslatingHolder(val binding: ActivityReaderListItemTranslatingBinding) : ReaderViewHolder(binding.root)
     data class TranslateAttributionHolder(val binding: ActivityReaderListItemTranslateAttributionBinding) : ReaderViewHolder(binding.root)
     data class GoogleTranslateAttributionHolder(val binding: ActivityReaderListItemGoogleTranslateAttributionBinding) : ReaderViewHolder(binding.root)
+    data class ChapterEndSpacerHolder(val binding: ActivityReaderListItemChapterEndSpacerBinding) : ReaderViewHolder(binding.root)
 }
