@@ -3,6 +3,7 @@ package my.novelreader.features.reader.manager
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import my.novelreader.data.AppRepository
+import my.novelreader.data.SyncRepository
 import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.features.reader.ReaderRepository
 import my.novelreader.features.reader.ui.ReaderViewHandlersActions
@@ -20,6 +21,7 @@ internal class ReaderSessionProvider @Inject constructor(
     private val readerRepository: ReaderRepository,
     private val readerViewHandlersActions: ReaderViewHandlersActions,
     private val chapterTranslationDao: ChapterTranslationDao,
+    private val syncRepository: SyncRepository,
 ) {
     fun create(
         bookUrl: String,
@@ -34,5 +36,6 @@ internal class ReaderSessionProvider @Inject constructor(
         readerRepository = readerRepository,
         readerViewHandlersActions = readerViewHandlersActions,
         chapterTranslationDao = chapterTranslationDao,
+        syncRepository = syncRepository,
     )
 }

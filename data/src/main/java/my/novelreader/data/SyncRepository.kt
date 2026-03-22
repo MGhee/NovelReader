@@ -118,43 +118,53 @@ class SyncRepository @Inject constructor(
             }
         }
 
+    private suspend fun buildBookSyncData(book: Book): Map<String, Any>? =
+        withContext(Dispatchers.IO) {
+            try {
+                val chapters = bookChaptersRepository.chapters(book.url)
+
+                // Get current chapter position from lastReadChapter (which chapter is being read)
+                val currentChapterPosition = if (!book.lastReadChapter.isNullOrEmpty()) {
+                    // Find the chapter by URL and get its position
+                    chapters.find { it.url == book.lastReadChapter }?.position ?: 0
+                } else {
+                    // Fallback: find max position of read chapters
+                    chapters.filter { it.read }.maxOfOrNull { it.position } ?: 0
+                }
+
+                Timber.d("Sync: Book ${book.title} - lastReadChapter=${book.lastReadChapter}, total chapters: ${chapters.size}, current position: $currentChapterPosition")
+
+                val chaptersData = chapters.map { chapter ->
+                    mapOf(
+                        "number" to (chapter.position + 1),
+                        "title" to (chapter.title ?: ""),
+                        "url" to chapter.url
+                    )
+                }
+
+                mapOf(
+                    "siteUrl" to book.url,
+                    "title" to book.title,
+                    "status" to if (book.completed) "COMPLETED" else "READING",
+                    "currentChapter" to (currentChapterPosition + 1).toString(),
+                    "totalChapters" to chapters.size.toString(),
+                    "chapters" to chaptersData,
+                    "coverUrl" to book.coverImageUrl,
+                    "description" to book.description,
+                    "updatedAt" to System.currentTimeMillis().toString(),
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to build sync data for book: ${book.url}")
+                null
+            }
+        }
+
     suspend fun pushLibraryToServer(serverUrl: String, localBooks: List<Book>, apiKey: String = ""): Response<SyncResponse> =
         withContext(Dispatchers.IO) {
             try {
                 // Convert local books to sync format
                 val syncBooks = localBooks.mapNotNull { book ->
-                    val chapters = bookChaptersRepository.chapters(book.url)
-
-                    // Get current chapter position from lastReadChapter (which chapter is being read)
-                    val currentChapterPosition = if (!book.lastReadChapter.isNullOrEmpty()) {
-                        // Find the chapter by URL and get its position
-                        chapters.find { it.url == book.lastReadChapter }?.position ?: 0
-                    } else {
-                        // Fallback: find max position of read chapters
-                        chapters.filter { it.read }.maxOfOrNull { it.position } ?: 0
-                    }
-
-                    Timber.d("Sync: Book ${book.title} - lastReadChapter=${book.lastReadChapter}, total chapters: ${chapters.size}, current position: $currentChapterPosition")
-
-                    val chaptersData = chapters.map { chapter ->
-                        mapOf(
-                            "number" to (chapter.position + 1),
-                            "title" to (chapter.title ?: ""),
-                            "url" to chapter.url
-                        )
-                    }
-
-                    mapOf(
-                        "siteUrl" to book.url,
-                        "title" to book.title,
-                        "status" to if (book.completed) "COMPLETED" else "READING",
-                        "currentChapter" to (currentChapterPosition + 1).toString(),
-                        "totalChapters" to chapters.size.toString(),
-                        "chapters" to chaptersData,
-                        "coverUrl" to book.coverImageUrl,
-                        "description" to book.description,
-                        "updatedAt" to System.currentTimeMillis().toString(),
-                    )
+                    buildBookSyncData(book)
                 }
 
                 val jsonPayload = buildJsonObject {
@@ -203,6 +213,71 @@ class SyncRepository @Inject constructor(
                 Response.Success(syncResponse)
             } catch (e: Exception) {
                 Timber.e(e, "Failed to push library to server")
+                Response.Error("Network error: ${e.message}", e)
+            }
+        }
+
+    suspend fun pushSingleBookToServer(
+        serverUrl: String,
+        bookUrl: String,
+        apiKey: String = ""
+    ): Response<SyncResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val book = libraryBooksRepository.get(bookUrl)
+                if (book == null) {
+                    Timber.w("SyncRepository: Book not found: $bookUrl")
+                    return@withContext Response.Error("Book not found", Exception())
+                }
+
+                val syncBook = buildBookSyncData(book) ?: return@withContext Response.Error("Failed to build book data", Exception())
+
+                val jsonPayload = buildJsonObject {
+                    put("books", buildJsonArray {
+                        add(buildJsonObject {
+                            put("siteUrl", syncBook["siteUrl"] as String)
+                            put("title", syncBook["title"] as String)
+                            put("status", syncBook["status"] as String)
+                            put("currentChapter", syncBook["currentChapter"] as String)
+                            put("totalChapters", syncBook["totalChapters"] as String)
+                            put("coverUrl", syncBook["coverUrl"] as? String ?: "")
+                            put("description", syncBook["description"] as? String ?: "")
+                            put("updatedAt", syncBook["updatedAt"] as String)
+                            put("chapters", buildJsonArray {
+                                @Suppress("UNCHECKED_CAST")
+                                val chapters = syncBook["chapters"] as List<Map<String, Any>>
+                                for (chapter in chapters) {
+                                    add(buildJsonObject {
+                                        put("number", (chapter["number"] as Int).toString())
+                                        put("title", chapter["title"] as String)
+                                        put("url", chapter["url"] as String)
+                                    })
+                                }
+                            })
+                        })
+                    })
+                }
+                val jsonBody = jsonPayload.toString().toRequestBody("application/json".toMediaType())
+
+                val requestBuilder = Request.Builder().url("$serverUrl/api/sync/push").post(jsonBody)
+                if (apiKey.isNotBlank()) requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+                val request = requestBuilder.build()
+
+                val client = (networkClient as? ScraperNetworkClient)?.client ?: return@withContext Response.Error("Invalid network client", Exception())
+                val response = client.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    Timber.e("SyncRepository: Push failed, code=${response.code}")
+                    return@withContext Response.Error("Server error: ${response.code}", Exception())
+                }
+
+                val body = response.body?.string() ?: ""
+                val syncResponse = json.decodeFromString<SyncResponse>(body)
+                Timber.d("SyncRepository: Single book pushed successfully: $bookUrl")
+
+                Response.Success(syncResponse)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to push single book to server: $bookUrl")
                 Response.Error("Network error: ${e.message}", e)
             }
         }

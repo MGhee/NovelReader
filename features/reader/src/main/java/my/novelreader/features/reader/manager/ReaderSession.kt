@@ -11,12 +11,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import my.novelreader.data.AppRepository
+import my.novelreader.data.SyncRepository
 import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.features.reader.ReaderRepository
 import my.novelreader.features.reader.domain.ChapterLoaded
@@ -48,6 +50,7 @@ internal class ReaderSession(
     @ApplicationContext private val context: Context,
     translationManager: TranslationManager,
     private val chapterTranslationDao: ChapterTranslationDao,
+    private val syncRepository: SyncRepository,
 ) {
     private val scope: CoroutineScope = CoroutineScope(
         SupervisorJob() + Dispatchers.Default + CoroutineName("ReaderSession")
@@ -57,7 +60,7 @@ internal class ReaderSession(
 
     private val readRoutine = ChaptersIsReadRoutine(appRepository)
     private val orderedChapters = mutableListOf<Chapter>()
-    
+
     // Track which chapter index has been triggered for pre-translation to avoid duplicates
     private var lastPreTranslatedChapterIndex: Int = -1
 
@@ -77,6 +80,21 @@ internal class ReaderSession(
             savePositionMode.value == SavePositionMode.Reading
         ) {
             readerRepository.saveBookLastReadPositionState(bookUrl, new, old)
+            syncOnChapterChange()
+        }
+    }
+
+    private fun syncOnChapterChange() {
+        val serverUrl = appPreferences.SYNC_SERVER_URL.value
+        if (serverUrl.isBlank()) return
+        val apiKey = appPreferences.SYNC_API_KEY.value
+        scope.launch(Dispatchers.IO) {
+            delay(1000) // Ensure position save completes before reading from DB
+            syncRepository.pushSingleBookToServer(
+                serverUrl = serverUrl,
+                bookUrl = bookUrl,
+                apiKey = apiKey
+            )
         }
     }
 

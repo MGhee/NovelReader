@@ -84,7 +84,7 @@ internal fun ReaderChapterListScreen(
     ) {
         // Top Bar
         TopAppBar(
-            title = { Text(stringResource(id = R.string.chapter_list), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp, top = 10.dp)) },
+            title = { Text(stringResource(id = R.string.chapter_list), style = MaterialTheme.typography.titleLarge) },
             navigationIcon = {
                 IconButton(onClick = onBackClick) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -98,7 +98,6 @@ internal fun ReaderChapterListScreen(
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             ),
-            modifier = Modifier.height(52.dp)
         )
 
         // Search Bar - Compact, extends to edges with top separation

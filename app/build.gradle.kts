@@ -67,6 +67,7 @@ android {
         }
 
         named("debug") {
+            applicationIdSuffix = ".debug"
             postprocessing {
                 isRemoveUnusedCode = false
                 isObfuscate = false

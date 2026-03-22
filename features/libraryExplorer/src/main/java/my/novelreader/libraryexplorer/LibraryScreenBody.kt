@@ -1,6 +1,7 @@
 package my.novelreader.libraryexplorer
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ExperimentalMaterialApi
@@ -36,12 +37,23 @@ internal fun LibraryScreenBody(
             .pullRefresh(state = pullRefreshState)
             .padding(innerPadding),
     ) {
-        LibraryPageBody(
-            list = viewModel.list,
-            onClick = onBookClick,
-            onMenuClick = onBookMenuClick,
-            downloadProgress = viewModel.downloadProgress
-        )
+        Column {
+            val continueBook = viewModel.continueReadingBook
+            if (continueBook != null) {
+                ContinueReadingBanner(
+                    book = continueBook,
+                    chapterTitle = viewModel.continueReadingChapterTitle,
+                    chapterPosition = viewModel.continueReadingChapterPosition,
+                    onClick = { onBookClick(continueBook) }
+                )
+            }
+            LibraryPageBody(
+                list = viewModel.list,
+                onClick = onBookClick,
+                onMenuClick = onBookMenuClick,
+                downloadProgress = viewModel.downloadProgress,
+            )
+        }
         PullRefreshIndicator(
             refreshing = viewModel.isPullRefreshing,
             state = pullRefreshState,

@@ -262,6 +262,8 @@ internal class ReaderItemBinder(
         setTextIsSelectable(selectableText)
         if (selectableText) {
             setTextSelectionAwareClick { onClick() }
+        } else {
+            setOnClickListener { onClick() }
         }
     }
 

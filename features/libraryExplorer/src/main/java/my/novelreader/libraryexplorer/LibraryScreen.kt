@@ -22,10 +22,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import my.novelreader.coreui.theme.ColorNotice
@@ -50,42 +55,49 @@ fun LibraryScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
-                ),
-                title = {
-                    Text(
-                        text = stringResource(id = R.string.app_name),
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                },
-                actions = {
-                    IconButton(
-                        onClick = { libraryModel.showBottomSheet = !libraryModel.showBottomSheet }
-                    ) {
-                        Icon(
-                            Icons.Filled.FilterList,
-                            stringResource(R.string.filter),
-                            tint = ColorNotice
+            Column {
+                TopAppBar(
+                    scrollBehavior = scrollBehavior,
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                    title = {
+                        Text(
+                            text = stringResource(id = R.string.app_name),
+                            style = MaterialTheme.typography.headlineSmall
                         )
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { libraryModel.showBottomSheet = !libraryModel.showBottomSheet }
+                        ) {
+                            Icon(
+                                Icons.Filled.FilterList,
+                                stringResource(R.string.filter),
+                                tint = ColorNotice
+                            )
+                        }
+                        IconButton(
+                            onClick = { showDropDown = !showDropDown }
+                        ) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                stringResource(R.string.options_panel)
+                            )
+                            LibraryDropDown(
+                                expanded = showDropDown,
+                                onDismiss = { showDropDown = false }
+                            )
+                        }
                     }
-                    IconButton(
-                        onClick = { showDropDown = !showDropDown }
-                    ) {
-                        Icon(
-                            Icons.Filled.MoreVert,
-                            stringResource(R.string.options_panel)
-                        )
-                        LibraryDropDown(
-                            expanded = showDropDown,
-                            onDismiss = { showDropDown = false }
-                        )
-                    }
-                }
-            )
+                )
+                HorizontalDivider(
+                    modifier = Modifier.fillMaxWidth(),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
         },
         content = { innerPadding ->
             LibraryScreenBody(

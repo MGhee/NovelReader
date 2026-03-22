@@ -49,10 +49,27 @@ internal class LibraryViewModel @Inject constructor(
     var readFilter by appPreferences.LIBRARY_FILTER_READ.state(viewModelScope)
     var readSort by appPreferences.LIBRARY_SORT_LAST_READ.state(viewModelScope)
 
+    // The most recently read book for the continue reading banner
+    var continueReadingBook by mutableStateOf<BookWithContext?>(null)
+        private set
+    var continueReadingChapterTitle by mutableStateOf<String?>(null)
+        private set
+    var continueReadingChapterPosition by mutableStateOf(0)
+        private set
+
     init {
         viewModelScope.launch {
-            appRepository.libraryBooks.getBooksInLibraryWithContextFlow.collect {
-                _list.value = it
+            appRepository.libraryBooks.getBooksInLibraryWithContextFlow.collect { books ->
+                _list.value = books.sortedByDescending { it.book.lastReadEpochTimeMilli }
+
+                // Update continue reading banner
+                val lastRead = _list.value.firstOrNull { it.book.lastReadEpochTimeMilli > 0 }
+                continueReadingBook = lastRead
+                val chapter = lastRead?.book?.lastReadChapter?.let { chapterUrl ->
+                    appRepository.bookChapters.get(chapterUrl)
+                }
+                continueReadingChapterTitle = chapter?.title
+                continueReadingChapterPosition = (chapter?.position ?: -1) + 1
             }
         }
     }
