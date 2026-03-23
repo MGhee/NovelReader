@@ -10,7 +10,6 @@ import my.novelreader.scraper.sources.IndoWebnovel
 import my.novelreader.scraper.sources.LocalSource
 import my.novelreader.scraper.sources.MeioNovel
 import my.novelreader.scraper.sources.MoreNovel
-import my.novelreader.scraper.sources.NovelBin
 import my.novelreader.scraper.sources.NovelHall
 import my.novelreader.scraper.sources.Novelku
 import my.novelreader.scraper.sources.ReadNovelFull
@@ -26,12 +25,8 @@ import my.novelreader.scraper.sources.FreeWebNovel
 import my.novelreader.scraper.sources.NovelFull
 import my.novelreader.scraper.sources.AllNovel
 import my.novelreader.scraper.sources.NovelBinCom
-import my.novelreader.scraper.sources.ReadMTL
 import my.novelreader.scraper.sources.NewNovel
-import my.novelreader.scraper.sources.SonicMTL
 import my.novelreader.scraper.sources.NoBadNovel
-import my.novelreader.scraper.sources.FanMTL
-import my.novelreader.scraper.sources.LNMTL
 import my.novelreader.scraper.sources.WtrLab
 import my.novelreader.scraper.sources.Shuba69
 import my.novelreader.scraper.sources.UuKanshu
@@ -77,18 +72,13 @@ class Scraper @Inject constructor(
         MoreNovel(networkClient),
         Novelku(networkClient),
         WbNovel(networkClient),
-        NovelBin(networkClient),
         ScribbleHub(networkClient),
         FreeWebNovel(networkClient),
         NovelFull(networkClient),
         AllNovel(networkClient),
         NovelBinCom(networkClient),
-        ReadMTL(networkClient),
         NewNovel(networkClient),
-        SonicMTL(networkClient),
         NoBadNovel(networkClient),
-        FanMTL(networkClient),
-        LNMTL(networkClient),
         WtrLab(networkClient),
     )
 

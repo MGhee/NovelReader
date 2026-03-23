@@ -5,6 +5,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import my.novelreader.coreui.BaseViewModel
 import my.novelreader.coreui.components.ToolbarMode
@@ -46,6 +48,8 @@ internal class SourceCatalogViewModel @Inject constructor(
         listLayoutMode = appPreferences.BOOKS_LIST_LAYOUT_MODE.state(viewModelScope),
     )
 
+    private var searchJob: Job? = null
+
     init {
         onSearchCatalog()
     }
@@ -56,7 +60,21 @@ internal class SourceCatalogViewModel @Inject constructor(
         state.fetchIterator.fetchNext()
     }
 
+    fun onSearchTextChange(input: String) {
+        state.searchTextInput.value = input
+        searchJob?.cancel()
+        if (input.isBlank()) {
+            onSearchCatalog()
+            return
+        }
+        searchJob = viewModelScope.launch {
+            delay(400) // 400ms debounce
+            onSearchText(input)
+        }
+    }
+
     fun onSearchText(input: String) {
+        searchJob?.cancel()
         state.fetchIterator.setFunction { source.getCatalogSearch(it, input).mapToBookMetadata() }
         state.fetchIterator.reset()
         state.fetchIterator.fetchNext()

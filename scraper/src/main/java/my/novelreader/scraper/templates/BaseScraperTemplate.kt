@@ -157,7 +157,7 @@ abstract class BaseScraperTemplate(
                     BookResult(
                         title = title,
                         url = transformBookUrl(url),
-                        coverImageUrl = processImageUrlWhen(transformCoverUrl(cover))
+                        coverImageUrl = if (cover.isEmpty()) "" else processImageUrlWhen(transformCoverUrl(cover))
                     )
                 }
 
@@ -177,7 +177,7 @@ abstract class BaseScraperTemplate(
         return BookResult(
             title = title,
             url = transformBookUrl(url),
-            coverImageUrl = processImageUrlWhen(transformCoverUrl(cover))
+            coverImageUrl = if (cover.isEmpty()) "" else processImageUrlWhen(transformCoverUrl(cover))
         )
     }
 

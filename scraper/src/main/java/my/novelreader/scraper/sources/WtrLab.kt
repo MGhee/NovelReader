@@ -19,9 +19,9 @@ import org.jsoup.nodes.Document
 
 /**
  * Novel main page (chapter list) example:
- * https://wtr-lab.com/en/serie-123/novel-name
+ * https://wtr-lab.com/en/novel/123/novel-name
  * Chapter url example:
- * https://wtr-lab.com/en/serie-123/novel-name/chapter-1
+ * https://wtr-lab.com/en/novel/123/novel-name/chapter-1
  */
 class WtrLab(
     private val networkClient: NetworkClient
@@ -29,7 +29,7 @@ class WtrLab(
     override val id = "wtrlab"
     override val nameStrId = R.string.source_name_wtrlab
     override val baseUrl = "https://wtr-lab.com/"
-    override val catalogUrl = "https://wtr-lab.com/en/library"
+    override val catalogUrl = "https://wtr-lab.com/en/novel-list"
     override val language = LanguageCode.ENGLISH
 
     override suspend fun getChapterTitle(doc: Document): String? =
@@ -141,7 +141,7 @@ class WtrLab(
                 (1..chapterCount).map { chapterNo ->
                     ChapterResult(
                         title = "Chapter $chapterNo",
-                        url = "$baseUrl/en/serie-$rawId/$slug/chapter-$chapterNo"
+                        url = "$baseUrl/en/novel/$rawId/$slug/chapter-$chapterNo"
                     )
                 }
             } else {
@@ -155,25 +155,41 @@ class WtrLab(
     ): Response<PagedList<BookResult>> = withContext(Dispatchers.Default) {
         tryConnect("index=$index") {
             val page = index + 1
-            val url = "$baseUrl/en/library?page=$page"
+            val url = "$catalogUrl?page=$page"
 
             val doc = networkClient.get(url).toDocument()
-            val books = doc.select(".novel-item, .book-item").mapNotNull {
-                val link = it.selectFirst("a[href*=\"/serie-\"]") ?: return@mapNotNull null
-                val title = it.selectFirst(".title, .book-title")?.text() ?: link.text()
-                val bookCover = it.selectFirst("img[src]")?.attr("src") ?: ""
-                
-                BookResult(
-                    title = title,
-                    url = link.attr("href"),
-                    coverImageUrl = bookCover
-                )
+            val nextDataScript = doc.selectFirst("script#__NEXT_DATA__")?.html() ?: ""
+
+            val books = mutableListOf<BookResult>()
+            val root = com.google.gson.JsonParser.parseString(nextDataScript).asJsonObject
+            val pageProps = root.getAsJsonObject("props").getAsJsonObject("pageProps")
+            val seriesArray = pageProps.getAsJsonArray("series")
+            val totalCount = pageProps.get("count")?.asString?.toIntOrNull() ?: 0
+
+            seriesArray?.forEach { item ->
+                try {
+                    val obj = item.asJsonObject
+                    val rawId = obj.get("raw_id").asInt
+                    val slug = obj.get("slug").asString
+                    val data = obj.getAsJsonObject("data")
+                    val title = data.get("title").asString
+                    val image = data.get("image")?.asString ?: ""
+
+                    books.add(BookResult(
+                        title = title,
+                        url = "${baseUrl}en/novel/$rawId/$slug",
+                        coverImageUrl = image
+                    ))
+                } catch (e: Exception) {
+                    // Skip malformed entries
+                }
             }
 
+            val itemsSoFar = page * 10
             PagedList(
                 list = books,
                 index = index,
-                isLastPage = books.isEmpty() || doc.selectFirst(".pagination .next") == null
+                isLastPage = books.isEmpty() || itemsSoFar >= totalCount
             )
         }
     }
@@ -203,12 +219,13 @@ class WtrLab(
                 val slug = novel.get("slug").asString
                 val title = data.get("title").asString
                 val author = data.get("author").asString
-                val status = if (novel.get("status").asBoolean) "Ongoing" else "Completed"
+                val statusInt = novel.get("status")?.asInt ?: 0
+                val status = if (statusInt == 1) "Ongoing" else "Completed"
                 
                 books.add(
                     BookResult(
                         title = title,
-                        url = "$baseUrl/en/serie-$rawId/f$slug",
+                        url = "$baseUrl/en/novel/$rawId/$slug",
                         coverImageUrl = data.get("image")?.asString ?: "",
                         description = "Author: $author | Status: $status"
                     )

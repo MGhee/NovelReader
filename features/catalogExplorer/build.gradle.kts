@@ -15,6 +15,7 @@ dependencies {
     implementation(projects.scraper)
     implementation(projects.navigation)
     implementation(projects.tooling.localDatabase)
+    implementation(projects.tooling.algorithms)
 
     implementation(libs.compose.androidx.activity)
     implementation(libs.compose.material3.android)

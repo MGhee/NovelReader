@@ -130,7 +130,6 @@ internal fun SourceCatalogScreen(
                                 onSearchCatalogSubmit()
                             },
                             onTextDone = {
-                                onSearchTextInputChange(it)
                                 onSearchTextInputSubmit(it)
                             },
                             placeholderText = stringResource(R.string.search_by_title),

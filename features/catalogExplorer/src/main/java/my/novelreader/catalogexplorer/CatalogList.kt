@@ -3,8 +3,11 @@ package my.novelreader.catalogexplorer
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,15 +17,17 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -49,82 +54,138 @@ internal fun CatalogList(
     onDatabaseClick: (DatabaseInterface) -> Unit,
     onSourceClick: (SourceInterface.Catalog) -> Unit,
     onSourceSetPinned: (id: String, pinned: Boolean) -> Unit,
+    getOrCreatePopularBooksIterator: (CatalogItem) -> my.novelreader.coreui.states.PagedListIteratorState<my.novelreader.scraper.domain.BookResult>,
+    onBookClick: (my.novelreader.feature.local_database.BookMetadata) -> Unit,
 ) {
+    val pinnedSources = sourcesList.filter { it.pinned }
+    val unpinnedSources = sourcesList.filter { !it.pinned }
+
     LazyColumn(
-        contentPadding = PaddingValues(bottom = 300.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 300.dp, start = 8.dp, end = 8.dp, top = 8.dp),
         modifier = Modifier.padding(paddingValues = innerPadding)
     ) {
+        // Databases section
         item {
             Text(
                 text = stringResource(id = R.string.database),
                 style = MaterialTheme.typography.titleMedium,
                 color = ColorAccent,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 8.dp),
-            )
-        }
-
-        items(databasesList) {
-            ListItem(
-                modifier = Modifier
-                    .clickable { onDatabaseClick(it) },
-                headlineContent = {
-                    Text(
-                        text = stringResource(id = it.nameStrId),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                },
-                supportingContent = {
-                    Text(
-                        text = stringResource(R.string.english),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                },
-                leadingContent = {
-                    ImageViewGlide(
-                        imageModel = it.iconUrl,
-                        modifier = Modifier.size(28.dp),
-                        error = R.drawable.default_icon
-                    )
-                }
             )
         }
 
         item {
-            Text(
-                text = stringResource(id = R.string.sources),
-                style = MaterialTheme.typography.titleMedium,
-                color = ColorAccent,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 8.dp),
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                databasesList.forEach { database ->
+                    ElevatedCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onDatabaseClick(database) }
+                    ) {
+                        Column(
+                            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            ImageViewGlide(
+                                imageModel = database.iconUrl,
+                                modifier = Modifier.size(32.dp),
+                                error = R.drawable.default_icon
+                            )
+                            Text(
+                                text = stringResource(id = database.nameStrId),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
 
-        items(
-            items = sourcesList,
-            key = { it.catalog.id }
-        ) {
-            ListItem(
+        // Pinned sources section
+        if (pinnedSources.isNotEmpty()) {
+            item {
+                Text(
+                    text = stringResource(id = R.string.pinned_sources),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ColorAccent,
+                )
+            }
+
+            items(
+                items = pinnedSources,
+                key = { it.catalog.id }
+            ) { catalogItem ->
+                SourceCard(
+                    catalogItem = catalogItem,
+                    onSourceClick = onSourceClick,
+                    onSourceSetPinned = onSourceSetPinned,
+                    getOrCreatePopularBooksIterator = getOrCreatePopularBooksIterator,
+                    onBookClick = onBookClick,
+                    modifier = Modifier.animateItemPlacement()
+                )
+            }
+        }
+
+        // All sources section
+        if (unpinnedSources.isNotEmpty()) {
+            item {
+                Text(
+                    text = stringResource(id = R.string.all_sources),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ColorAccent,
+                )
+            }
+
+            items(
+                items = unpinnedSources,
+                key = { it.catalog.id }
+            ) { catalogItem ->
+                SourceCard(
+                    catalogItem = catalogItem,
+                    onSourceClick = onSourceClick,
+                    onSourceSetPinned = onSourceSetPinned,
+                    getOrCreatePopularBooksIterator = getOrCreatePopularBooksIterator,
+                    onBookClick = onBookClick,
+                    modifier = Modifier.animateItemPlacement()
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+private fun SourceCard(
+    catalogItem: CatalogItem,
+    onSourceClick: (SourceInterface.Catalog) -> Unit,
+    onSourceSetPinned: (id: String, pinned: Boolean) -> Unit,
+    getOrCreatePopularBooksIterator: (CatalogItem) -> my.novelreader.coreui.states.PagedListIteratorState<my.novelreader.scraper.domain.BookResult>,
+    onBookClick: (my.novelreader.feature.local_database.BookMetadata) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ElevatedCard(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Header row
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 modifier = Modifier
-                    .clickable { onSourceClick(it.catalog) }
-                    .animateItemPlacement(),
-                headlineContent = {
-                    Text(
-                        text = stringResource(id = it.catalog.nameStrId),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                },
-                supportingContent = {
-                    val langResId = it.catalog.language?.nameResId
-                    if (langResId != null) Text(
-                        text = stringResource(id = langResId),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                },
-                leadingContent = {
-                    val icon = it.catalog.iconUrl
+                    .fillMaxWidth()
+                    .clickable { onSourceClick(catalogItem.catalog) }
+                    .padding(8.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    val icon = catalogItem.catalog.iconUrl
                     if (icon is ImageVector) {
                         Icon(
                             imageVector = icon,
@@ -138,50 +199,80 @@ internal fun CatalogList(
                             error = R.drawable.default_icon
                         )
                     }
-                },
-                trailingContent = {
-                    Row {
-                        val catalog = it.catalog
-                        if (catalog is SourceInterface.Configurable) {
-                            var openConfig by rememberSaveable { mutableStateOf(false) }
-                            IconButton(
-                                onClick = { openConfig = !openConfig },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Settings,
-                                    contentDescription = stringResource(R.string.configuration),
-                                )
-                            }
-                            if (openConfig) {
-                                AlertDialog(
-                                    onDismissRequest = { openConfig = false },
-                                    confirmButton = {
-                                        FilledTonalButton(onClick = { openConfig = !openConfig }) {
-                                            Text(text = stringResource(R.string.close))
-                                        }
-                                    },
-                                    text = { catalog.ScreenConfig() },
-                                    icon = {
-                                        Icon(
-                                            Icons.Filled.Settings,
-                                            stringResource(id = R.string.configuration),
-                                            tint = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                        IconButton(
-                            onClick = { onSourceSetPinned(it.catalog.id, !it.pinned) },
-                        ) {
-                            AnimatedTransition(targetState = it.pinned) { pinned ->
-                                Icon(
-                                    imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                    contentDescription = stringResource(R.string.pin_or_unpin_source),
-                                )
-                            }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(id = catalogItem.catalog.nameStrId),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        catalogItem.catalog.language?.let {
+                            Text(
+                                text = stringResource(id = it.nameResId),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
                     }
+                }
+
+                Row {
+                    val catalog = catalogItem.catalog
+                    if (catalog is SourceInterface.Configurable) {
+                        var openConfig by rememberSaveable { mutableStateOf(false) }
+                        IconButton(onClick = { openConfig = !openConfig }) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = stringResource(R.string.configuration),
+                            )
+                        }
+                        if (openConfig) {
+                            AlertDialog(
+                                onDismissRequest = { openConfig = false },
+                                confirmButton = {
+                                    FilledTonalButton(onClick = { openConfig = !openConfig }) {
+                                        Text(text = stringResource(R.string.close))
+                                    }
+                                },
+                                text = { catalog.ScreenConfig() },
+                                icon = {
+                                    Icon(
+                                        Icons.Filled.Settings,
+                                        stringResource(id = R.string.configuration),
+                                        tint = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                            )
+                        }
+                    }
+                    IconButton(onClick = { onSourceSetPinned(catalogItem.catalog.id, !catalogItem.pinned) }) {
+                        AnimatedTransition(targetState = catalogItem.pinned) { pinned ->
+                            Icon(
+                                imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                contentDescription = stringResource(R.string.pin_or_unpin_source),
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Popular books carousel
+            Text(
+                text = stringResource(R.string.popular),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = 12.dp, start = 8.dp, bottom = 4.dp)
+            )
+
+            val iterator = getOrCreatePopularBooksIterator(catalogItem)
+            LaunchedEffect(catalogItem.catalog.id) {
+                if (iterator.list.isEmpty() && iterator.state == my.novelreader.coreui.states.IteratorState.IDLE) {
+                    iterator.fetchNext()
+                }
+            }
+
+            SourcePopularCarousel(
+                fetchIterator = iterator,
+                onBookClick = onBookClick,
+                modifier = Modifier.fillMaxWidth(),
+                fetchCoverUrl = { bookUrl ->
+                    (catalogItem.catalog.getBookCoverImageUrl(bookUrl) as? my.novelreader.core.Response.Success)?.data
                 }
             )
         }
@@ -197,6 +288,7 @@ private fun PreviewView() {
             pinned = index % 2 == 0,
         )
     }
+    val scope = rememberCoroutineScope()
 
     InternalTheme {
         CatalogList(
@@ -206,6 +298,12 @@ private fun PreviewView() {
             onDatabaseClick = {},
             onSourceClick = {},
             onSourceSetPinned = { _, _ -> },
+            getOrCreatePopularBooksIterator = { _ ->
+                my.novelreader.coreui.states.PagedListIteratorState(
+                    scope
+                ) { throw NotImplementedError() }
+            },
+            onBookClick = {},
         )
     }
 }

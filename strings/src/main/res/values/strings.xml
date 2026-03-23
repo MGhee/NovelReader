@@ -45,6 +45,11 @@
     <string name="image">image</string>
     <string name="importing_epub">Importing epub</string>
     <string name="no_results_found">No results found</string>
+    <string name="pinned_sources">Pinned Sources</string>
+    <string name="all_sources">All Sources</string>
+    <string name="popular">Popular</string>
+    <string name="did_you_mean">Did you mean: %s?</string>
+    <string name="search_all_sources">Search all sources</string>
     <string name="updating_library_notice">Updating library</string>
     <string name="search_by_title">Search by title</string>
     <string name="clean_images_folder">Clean images folder</string>
