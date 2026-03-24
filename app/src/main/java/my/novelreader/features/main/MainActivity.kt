@@ -36,6 +36,7 @@ import my.novelreader.coreui.theme.Theme
 import my.novelreader.R
 import my.novelreader.catalogexplorer.CatalogExplorerScreen
 import my.novelreader.libraryexplorer.LibraryScreen
+import my.novelreader.personal.PersonalScreen
 import my.novelreader.settings.SettingsScreen
 import my.novelreader.tooling.epub_importer.EpubImportService
 
@@ -47,6 +48,7 @@ private data class Page(
 private val pages = listOf(
     Page(iconRes = R.drawable.ic_baseline_home_24, stringRes = R.string.title_library),
     Page(iconRes = R.drawable.ic_baseline_menu_book_24, stringRes = R.string.title_finder),
+    Page(iconRes = R.drawable.ic_outline_person_24, stringRes = R.string.title_personal),
     Page(iconRes = R.drawable.ic_twotone_settings_24, stringRes = R.string.title_settings),
 )
 
@@ -78,7 +80,8 @@ open class MainActivity : BaseActivity() {
                             when (it) {
                                 0 -> LibraryScreen()
                                 1 -> CatalogExplorerScreen()
-                                2 -> SettingsScreen()
+                                2 -> PersonalScreen()
+                                3 -> SettingsScreen()
                             }
                         }
                     }

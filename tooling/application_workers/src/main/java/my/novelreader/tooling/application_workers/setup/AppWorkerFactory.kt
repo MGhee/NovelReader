@@ -9,7 +9,6 @@ import androidx.work.WorkerParameters
 import my.novelreader.coreui.states.NotificationsCenter
 import my.novelreader.data.AppRemoteRepository
 import my.novelreader.data.SyncRepository
-import my.novelreader.interactor.LibraryUpdatesInteractions
 import my.novelreader.tooling.application_workers.LibraryUpdatesWorker
 import my.novelreader.tooling.application_workers.SyncWorker
 import my.novelreader.tooling.application_workers.UpdatesCheckerWorker
@@ -19,8 +18,6 @@ import javax.inject.Inject
 class AppWorkerFactory @Inject internal constructor(
     private val appRemoteRepository: AppRemoteRepository,
     private val notificationsCenter: NotificationsCenter,
-    private val libraryUpdateNotification: LibraryUpdateNotification,
-    private val libraryUpdatesInteractions: LibraryUpdatesInteractions,
     private val syncRepository: SyncRepository,
 ) : WorkerFactory() {
     @SuppressLint("LogNotTimber")
@@ -38,12 +35,7 @@ class AppWorkerFactory @Inject internal constructor(
                 appRemoteRepository = appRemoteRepository,
                 notificationsCenter = notificationsCenter
             )
-            LibraryUpdatesWorker::class.java.name -> LibraryUpdatesWorker(
-                context = appContext,
-                workerParameters = workerParameters,
-                libraryUpdateNotification = libraryUpdateNotification,
-                libraryUpdatesInteractions = libraryUpdatesInteractions,
-            )
+            LibraryUpdatesWorker::class.java.name -> null  // Let Hilt handle injection for HiltWorker
             SyncWorker::class.java.name -> SyncWorker(
                 context = appContext,
                 workerParameters = workerParameters,

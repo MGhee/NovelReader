@@ -48,6 +48,9 @@ class LibraryBooksRepository @Inject constructor(
 
     suspend fun get(url: String) = libraryDao.get(url)
 
+    suspend fun updateLastSeenChaptersCount(bookUrl: String, count: Int) =
+        libraryDao.updateLastSeenChaptersCount(bookUrl, count)
+
     suspend fun updateLastReadChapter(bookUrl: String, lastReadChapterUrl: String) =
         libraryDao.updateLastReadChapter(
             bookUrl = bookUrl,

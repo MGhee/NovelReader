@@ -5,11 +5,13 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -21,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import my.novelreader.interactor.LibraryUpdatesInteractions
 import my.novelreader.core.Response
+import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.core.domain.LibraryCategory
 import my.novelreader.core.tryAsResponse
 import my.novelreader.feature.local_database.tables.Book
@@ -34,6 +37,8 @@ internal class LibraryUpdatesWorker @AssistedInject constructor(
     @Assisted workerParameters: WorkerParameters,
     private val libraryUpdateNotification: LibraryUpdateNotification,
     private val libraryUpdatesInteractions: LibraryUpdatesInteractions,
+    private val appPreferences: AppPreferences,
+    private val workManager: WorkManager,
 ) : CoroutineWorker(context, workerParameters) {
 
     companion object {
@@ -145,6 +150,18 @@ internal class LibraryUpdatesWorker @AssistedInject constructor(
                     newChapters = newUpdate.newChapters,
                     silent = index == 0
                 )
+            }
+
+            // Auto-download new chapters if enabled
+            if (appPreferences.GLOBAL_APP_AUTOMATIC_DOWNLOAD_NEW_CHAPTERS.value) {
+                newUpdates.value.forEach { newUpdate ->
+                    Timber.d("Auto-downloading chapters for ${newUpdate.book.title}")
+                    workManager.beginUniqueWork(
+                        "ChapterDownload_${newUpdate.book.url}",
+                        ExistingWorkPolicy.REPLACE,
+                        ChapterDownloadWorker.createRequest(newUpdate.book.url)
+                    ).enqueue()
+                }
             }
 
             if (failedUpdates.value.isNotEmpty()) {

@@ -111,6 +111,31 @@ internal fun LibraryPageBody(
                     }
                 }
 
+                // New chapters badge
+                if (book.newChaptersCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 4.dp, top = 4.dp)
+                            .background(
+                                MaterialTheme.colorScheme.tertiary,
+                                CircleShape
+                            )
+                            .size(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (book.newChaptersCount > 99) "99+" else "${book.newChaptersCount}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onTertiary,
+                            maxLines = 1,
+                        )
+                    }
+                }
+
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)

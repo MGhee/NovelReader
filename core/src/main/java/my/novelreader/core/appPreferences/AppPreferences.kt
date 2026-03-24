@@ -190,6 +190,11 @@ class AppPreferences @Inject constructor(
             override var value by SharedPreference_Int(name, preferences, 24)
         }
 
+    val GLOBAL_APP_AUTOMATIC_DOWNLOAD_NEW_CHAPTERS =
+        object : Preference<Boolean>("GLOBAL_APP_AUTOMATIC_DOWNLOAD_NEW_CHAPTERS") {
+            override var value by SharedPreference_Boolean(name, preferences, false)
+        }
+
     val TRANSLATION_GEMINI_API_KEY =
         object : Preference<String>("TRANSLATION_GEMINI_API_KEY") {
             override var value by SharedPreference_String(name, preferences, "")

@@ -62,7 +62,13 @@ interface LibraryDao {
 
     @Query(
         """
-        SELECT Book.*, COUNT(Chapter.read) AS chaptersCount, SUM(Chapter.read) AS chaptersReadCount
+        SELECT Book.*,
+               COUNT(Chapter.read) AS chaptersCount,
+               SUM(Chapter.read) AS chaptersReadCount,
+               CASE WHEN Book.lastSeenChaptersCount > 0
+                    THEN MAX(COUNT(Chapter.read) - Book.lastSeenChaptersCount, 0)
+                    ELSE 0
+               END AS newChaptersCount
         FROM Book
         LEFT JOIN Chapter ON Chapter.bookUrl = Book.url
         WHERE Book.inLibrary == 1
@@ -70,6 +76,9 @@ interface LibraryDao {
     """
     )
     fun getBooksInLibraryWithContextFlow(): Flow<List<BookWithContext>>
+
+    @Query("UPDATE Book SET lastSeenChaptersCount = :count WHERE url == :bookUrl")
+    suspend fun updateLastSeenChaptersCount(bookUrl: String, count: Int)
 
     @Query("DELETE FROM Book WHERE inLibrary == 0")
     suspend fun removeAllNonLibraryRows()

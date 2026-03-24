@@ -41,6 +41,7 @@ include(":tooling:epub_importer")
 include(":features:reader")
 include(":features:chaptersList")
 include(":features:globalSourceSearch")
+include(":features:personal")
 
 include(":navigation")
 include(":features:databaseExplorer")

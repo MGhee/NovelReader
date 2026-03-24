@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoMode
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -87,6 +88,38 @@ fun LibraryAutoUpdate(
             },
             leadingContent = {
                 Icon(Icons.Outlined.Timer, null, tint = MaterialTheme.colorScheme.onPrimary)
+            }
+        )
+        // Auto-download new chapters option
+        ListItem(
+            modifier = Modifier.clickable {
+                state.autoDownloadNewChapters.value = !state.autoDownloadNewChapters.value
+            },
+            headlineContent = {
+                Text(text = stringResource(R.string.automatically_download_new_chapters))
+            },
+            supportingContent = {
+                Text(text = stringResource(R.string.automatically_download_new_chapters_description))
+            },
+            leadingContent = {
+                Icon(
+                    Icons.Outlined.CloudDownload,
+                    null,
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            },
+            trailingContent = {
+                Switch(
+                    checked = state.autoDownloadNewChapters.value,
+                    onCheckedChange = {
+                        state.autoDownloadNewChapters.value = !state.autoDownloadNewChapters.value
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = ColorAccent,
+                        checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
+                    )
+                )
             }
         )
     }

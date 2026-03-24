@@ -66,6 +66,9 @@ internal class SettingsViewModel @Inject constructor(
             ),
             autoUpdateIntervalHours = appPreferences.GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_INTERVAL_HOURS.state(
                 viewModelScope
+            ),
+            autoDownloadNewChapters = appPreferences.GLOBAL_APP_AUTOMATIC_DOWNLOAD_NEW_CHAPTERS.state(
+                viewModelScope
             )
         ),
         geminiApiKey = appPreferences.TRANSLATION_GEMINI_API_KEY.state(viewModelScope),

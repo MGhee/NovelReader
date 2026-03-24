@@ -3,7 +3,7 @@
 /local.properties
 /.idea
 .DS_Store
-/build
+build/
 /captures
 .externalNativeBuild
 .cxx
@@ -11,6 +11,9 @@
 /word_database-shm
 /word_database-wal
 /app/release
+
+# Claude Code local settings
+.claude/settings.local.json
 
 # Keystore files - DO NOT commit these!
 *.jks

@@ -233,6 +233,12 @@ internal class LibraryViewModel @Inject constructor(
 
     
 
+    fun updateLastSeenChaptersCount(bookUrl: String, chaptersCount: Int) {
+        viewModelScope.launch {
+            appRepository.libraryBooks.updateLastSeenChaptersCount(bookUrl, chaptersCount)
+        }
+    }
+
     fun getBook(bookUrl: String) = appRepository.libraryBooks.getFlow(bookUrl).filterNotNull()
 }
 

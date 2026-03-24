@@ -26,11 +26,24 @@ data class ChapterMetadata(val title: String, val url: String) {
 data class BookWithContext(
     @Embedded val book: Book,
     val chaptersCount: Int,
-    val chaptersReadCount: Int
+    val chaptersReadCount: Int,
+    val newChaptersCount: Int = 0
 )
 
 data class ChapterWithContext(
     @Embedded val chapter: Chapter,
     val downloaded: Boolean,
     val lastReadChapter: Boolean
+)
+
+data class BookReadingStats(
+    val bookUrl: String,
+    val totalTime: Long,
+    val totalChapters: Int,
+)
+
+data class DailyReadingStats(
+    val dayEpoch: Long,
+    val totalTimeMillis: Long,
+    val totalChapters: Int,
 )

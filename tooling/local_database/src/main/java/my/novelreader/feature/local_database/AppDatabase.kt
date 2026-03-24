@@ -11,10 +11,12 @@ import my.novelreader.feature.local_database.DAOs.ChapterBodyDao
 import my.novelreader.feature.local_database.DAOs.ChapterDao
 import my.novelreader.feature.local_database.DAOs.ChapterTranslationDao
 import my.novelreader.feature.local_database.DAOs.LibraryDao
+import my.novelreader.feature.local_database.DAOs.ReadingSessionDao
 import my.novelreader.feature.local_database.tables.Book
 import my.novelreader.feature.local_database.tables.Chapter
 import my.novelreader.feature.local_database.tables.ChapterBody
 import my.novelreader.feature.local_database.tables.ChapterTranslation
+import my.novelreader.feature.local_database.tables.ReadingSession
 import java.io.InputStream
 
 
@@ -23,6 +25,7 @@ interface AppDatabase {
     fun chapterDao(): ChapterDao
     fun chapterBodyDao(): ChapterBodyDao
     fun chapterTranslationDao(): ChapterTranslationDao
+    fun readingSessionDao(): ReadingSessionDao
     val name: String
 
     fun closeDatabase()
@@ -60,9 +63,10 @@ interface AppDatabase {
         Book::class,
         Chapter::class,
         ChapterBody::class,
-        ChapterTranslation::class
+        ChapterTranslation::class,
+        ReadingSession::class
     ],
-    version = 9,
+    version = 11,
     exportSchema = false
 )
 internal abstract class AppRoomDatabase : RoomDatabase(), AppDatabase {
@@ -70,6 +74,7 @@ internal abstract class AppRoomDatabase : RoomDatabase(), AppDatabase {
     abstract override fun chapterDao(): ChapterDao
     abstract override fun chapterBodyDao(): ChapterBodyDao
     abstract override fun chapterTranslationDao(): ChapterTranslationDao
+    abstract override fun readingSessionDao(): ReadingSessionDao
 
     override lateinit var name: String
 

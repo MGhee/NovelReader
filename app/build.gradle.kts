@@ -108,6 +108,7 @@ dependencies {
     implementation(projects.features.reader)
     implementation(projects.features.chaptersList)
     implementation(projects.features.globalSourceSearch)
+    implementation(projects.features.personal)
     implementation(projects.features.databaseExplorer)
     implementation(projects.features.sourceExplorer)
     implementation(projects.features.catalogExplorer)

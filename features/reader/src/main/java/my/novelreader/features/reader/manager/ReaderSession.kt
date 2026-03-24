@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import my.novelreader.data.AppRepository
 import my.novelreader.data.SyncRepository
@@ -52,6 +53,9 @@ internal class ReaderSession(
     private val chapterTranslationDao: ChapterTranslationDao,
     private val syncRepository: SyncRepository,
 ) {
+    private var currentSessionId: Long = 0
+    private var chaptersReadInSession: Int = 0
+    private var lastCompletedChapterUrl: String = ""
     private val scope: CoroutineScope = CoroutineScope(
         SupervisorJob() + Dispatchers.Default + CoroutineName("ReaderSession")
     )
@@ -173,6 +177,9 @@ internal class ReaderSession(
                 bookUrl,
                 System.currentTimeMillis()
             )
+            // Start reading session tracking
+            currentSessionId = appRepository.readingStats.startSession(bookUrl)
+            chaptersReadInSession = 0
         }
         initReaderTTSObservers()
     }
@@ -284,6 +291,12 @@ internal class ReaderSession(
             )
         }
         readerTextToSpeech.onClose()
+
+        // End reading session - use runBlocking to ensure it completes before scope cancellation
+        runBlocking {
+            appRepository.readingStats.endSession(currentSessionId, chaptersReadInSession)
+        }
+
         scope.coroutineContext.cancelChildren()
         NarratorMediaControlsService.stop(context)
     }
@@ -331,6 +344,11 @@ internal class ReaderSession(
     }
 
     fun markChapterEndAsSeen(chapterUrl: String) {
+        // Only count each chapter once per session
+        if (chapterUrl != lastCompletedChapterUrl) {
+            lastCompletedChapterUrl = chapterUrl
+            chaptersReadInSession++
+        }
         readRoutine.setReadEnd(chapterUrl = chapterUrl)
     }
 

@@ -10,6 +10,7 @@ import my.novelreader.feature.local_database.DAOs.ChapterBodyDao
 import my.novelreader.feature.local_database.DAOs.ChapterDao
 import my.novelreader.feature.local_database.DAOs.ChapterTranslationDao
 import my.novelreader.feature.local_database.DAOs.LibraryDao
+import my.novelreader.feature.local_database.DAOs.ReadingSessionDao
 import javax.inject.Singleton
 
 @InstallIn(SingletonComponent::class)
@@ -42,5 +43,9 @@ abstract class LocalDatabaseModule {
         @Provides
         @Singleton
         fun provideChapterTranslationDao(database: AppDatabase): ChapterTranslationDao = database.chapterTranslationDao()
+
+        @Provides
+        @Singleton
+        fun provideReadingSessionDao(database: AppDatabase): ReadingSessionDao = database.readingSessionDao()
     }
 }

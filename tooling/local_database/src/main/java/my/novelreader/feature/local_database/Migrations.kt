@@ -38,8 +38,22 @@ internal fun databaseMigrations() = arrayOf(
             )
         """)
         it.execSQL("""
-            CREATE INDEX IF NOT EXISTS index_ChapterTranslation_chapterUrl_sourceLang_targetLang 
+            CREATE INDEX IF NOT EXISTS index_ChapterTranslation_chapterUrl_sourceLang_targetLang
             ON ChapterTranslation (chapterUrl, sourceLang, targetLang)
+        """)
+    },
+    migration(9) {
+        it.execSQL("ALTER TABLE Book ADD COLUMN lastSeenChaptersCount INTEGER NOT NULL DEFAULT 0")
+    },
+    migration(10) {
+        it.execSQL("""
+            CREATE TABLE IF NOT EXISTS ReadingSession (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                bookUrl TEXT NOT NULL,
+                startTimeEpochMilli INTEGER NOT NULL,
+                endTimeEpochMilli INTEGER NOT NULL DEFAULT 0,
+                chaptersRead INTEGER NOT NULL DEFAULT 0
+            )
         """)
     },
 )

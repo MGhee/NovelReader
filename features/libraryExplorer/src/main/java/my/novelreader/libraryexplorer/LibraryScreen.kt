@@ -105,6 +105,8 @@ fun LibraryScreen(
                 topAppBarState = scrollBehavior.state,
                 onBookClick = { book ->
                     coroutineScope.launch {
+                        libraryModel.updateLastSeenChaptersCount(book.book.url, book.chaptersCount)
+
                         val chapterUrl = libraryModel.getBookOpenChapterUrl(book.book.url)
                             ?: return@launch
 
