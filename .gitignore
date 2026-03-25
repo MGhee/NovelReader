@@ -20,3 +20,4 @@ build/
 *.keystore
 keychain
 key.properties
+.claude

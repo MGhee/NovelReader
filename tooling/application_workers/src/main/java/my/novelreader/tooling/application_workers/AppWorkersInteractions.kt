@@ -21,11 +21,11 @@ internal class AppWorkersInteractions @Inject constructor(
     }
 
     override fun syncWithServer(serverUrl: String, apiKey: String) {
-        workManager.beginUniqueWork(
+        workManager.enqueueUniqueWork(
             SyncWorker.TAG_MANUAL,
             ExistingWorkPolicy.REPLACE,
             SyncWorker.createManualRequest(serverUrl, apiKey)
-        ).enqueue()
+        )
     }
 
     override fun downloadAllBookChapters(bookUrl: String) {

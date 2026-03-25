@@ -2,6 +2,7 @@ package my.novelreader
 
 import android.app.Application
 import android.util.Log
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -30,6 +31,8 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             Timber.plant(Timber.DebugTree())
         }
         periodicWorkersInitializer.init()
+        // Register lifecycle observer for foreground sync
+        ProcessLifecycleOwner.get().lifecycle.addObserver(periodicWorkersInitializer)
     }
 
     override fun newImageLoader(): ImageLoader = when (val networkClient = networkClient) {

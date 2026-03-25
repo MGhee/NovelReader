@@ -32,6 +32,7 @@ data class SyncBook(
     val totalChapters: Int = 0,
     val coverUrl: String? = null,
     val description: String? = null,
+    val currentChapterUrl: String? = null,
     val updatedAt: String,
 )
 
@@ -59,6 +60,9 @@ class SyncRepository @Inject constructor(
 ) {
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    // Cache of server chapter counts to prevent pushing lower chapters
+    private val serverChapterCounts = mutableMapOf<String, Int>()
 
     suspend fun fetchLibraryFromServer(serverUrl: String, apiKey: String = ""): Response<List<SyncBook>> =
         withContext(Dispatchers.IO) {
@@ -107,6 +111,7 @@ class SyncRepository @Inject constructor(
                         totalChapters = obj["totalChapters"]?.jsonPrimitive?.intOrNull ?: 0,
                         coverUrl = obj["coverUrl"]?.jsonPrimitive?.content,
                         description = obj["description"]?.jsonPrimitive?.content,
+                        currentChapterUrl = obj["currentChapterUrl"]?.jsonPrimitive?.content,
                         updatedAt = obj["updatedAt"]?.jsonPrimitive?.content ?: "",
                     )
                 }
@@ -132,8 +137,6 @@ class SyncRepository @Inject constructor(
                     chapters.filter { it.read }.maxOfOrNull { it.position } ?: 0
                 }
 
-                Timber.d("Sync: Book ${book.title} - lastReadChapter=${book.lastReadChapter}, total chapters: ${chapters.size}, current position: $currentChapterPosition")
-
                 val chaptersData = chapters.map { chapter ->
                     mapOf(
                         "number" to (chapter.position + 1),
@@ -146,8 +149,8 @@ class SyncRepository @Inject constructor(
                     "siteUrl" to book.url,
                     "title" to book.title,
                     "status" to if (book.completed) "COMPLETED" else "READING",
-                    "currentChapter" to (currentChapterPosition + 1).toString(),
-                    "totalChapters" to chapters.size.toString(),
+                    "currentChapter" to (currentChapterPosition + 1),
+                    "totalChapters" to chapters.size,
                     "chapters" to chaptersData,
                     "coverUrl" to book.coverImageUrl,
                     "description" to book.description,
@@ -159,7 +162,12 @@ class SyncRepository @Inject constructor(
             }
         }
 
-    suspend fun pushLibraryToServer(serverUrl: String, localBooks: List<Book>, apiKey: String = ""): Response<SyncResponse> =
+    suspend fun pushLibraryToServer(
+        serverUrl: String,
+        localBooks: List<Book>,
+        apiKey: String = "",
+        serverChapterCounts: Map<String, Int> = emptyMap()
+    ): Response<SyncResponse> =
         withContext(Dispatchers.IO) {
             try {
                 // Convert local books to sync format
@@ -170,12 +178,15 @@ class SyncRepository @Inject constructor(
                 val jsonPayload = buildJsonObject {
                     put("books", buildJsonArray {
                         for (book in syncBooks) {
+                            val siteUrl = book["siteUrl"] as String
+                            val localChapter = book["currentChapter"] as Int
+                            val serverChapter = serverChapterCounts[siteUrl] ?: 0
                             add(buildJsonObject {
-                                put("siteUrl", book["siteUrl"] as String)
+                                put("siteUrl", siteUrl)
                                 put("title", book["title"] as String)
                                 put("status", book["status"] as String)
-                                put("currentChapter", book["currentChapter"] as String)
-                                put("totalChapters", book["totalChapters"] as String)
+                                put("currentChapter", maxOf(localChapter, serverChapter))
+                                put("totalChapters", book["totalChapters"] as Int)
                                 put("coverUrl", book["coverUrl"] as? String ?: "")
                                 put("description", book["description"] as? String ?: "")
                                 put("updatedAt", book["updatedAt"] as String)
@@ -184,7 +195,7 @@ class SyncRepository @Inject constructor(
                                     val chapters = book["chapters"] as List<Map<String, Any>>
                                     for (chapter in chapters) {
                                         add(buildJsonObject {
-                                            put("number", (chapter["number"] as Int).toString())
+                                            put("number", chapter["number"] as Int)
                                             put("title", chapter["title"] as String)
                                             put("url", chapter["url"] as String)
                                         })
@@ -204,6 +215,8 @@ class SyncRepository @Inject constructor(
                 val response = client.newCall(request).execute()
 
                 if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: ""
+                    Timber.e("SyncRepository: Push failed ${response.code}: $errorBody")
                     return@withContext Response.Error("Server error: ${response.code}", Exception())
                 }
 
@@ -232,14 +245,23 @@ class SyncRepository @Inject constructor(
 
                 val syncBook = buildBookSyncData(book) ?: return@withContext Response.Error("Failed to build book data", Exception())
 
+                val localChapter = syncBook["currentChapter"] as Int
+                val cachedServerChapter = serverChapterCounts[bookUrl] ?: 0
+                val chapterToSend = maxOf(localChapter, cachedServerChapter)
+
+                // Update cache if local is ahead
+                if (localChapter > cachedServerChapter) {
+                    serverChapterCounts[bookUrl] = localChapter
+                }
+
                 val jsonPayload = buildJsonObject {
                     put("books", buildJsonArray {
                         add(buildJsonObject {
                             put("siteUrl", syncBook["siteUrl"] as String)
                             put("title", syncBook["title"] as String)
                             put("status", syncBook["status"] as String)
-                            put("currentChapter", syncBook["currentChapter"] as String)
-                            put("totalChapters", syncBook["totalChapters"] as String)
+                            put("currentChapter", chapterToSend)
+                            put("totalChapters", syncBook["totalChapters"] as Int)
                             put("coverUrl", syncBook["coverUrl"] as? String ?: "")
                             put("description", syncBook["description"] as? String ?: "")
                             put("updatedAt", syncBook["updatedAt"] as String)
@@ -248,7 +270,7 @@ class SyncRepository @Inject constructor(
                                 val chapters = syncBook["chapters"] as List<Map<String, Any>>
                                 for (chapter in chapters) {
                                     add(buildJsonObject {
-                                        put("number", (chapter["number"] as Int).toString())
+                                        put("number", chapter["number"] as Int)
                                         put("title", chapter["title"] as String)
                                         put("url", chapter["url"] as String)
                                     })
@@ -298,17 +320,69 @@ class SyncRepository @Inject constructor(
                 }
                 val serverBooks = serverBooksResponse.data
 
-                // 3. Merge by siteUrl
+                // Update cached server chapter counts
+                for (book in serverBooks) {
+                    serverChapterCounts[book.siteUrl] = book.currentChapter
+                }
+
+                // 3. Merge by siteUrl: pull updates from server for existing books
                 var merged = 0
                 var created = 0
+                val updatedBookUrls = mutableSetOf<String>()
 
                 for (serverBook in serverBooks) {
                     val localBook = localBooks.find { it.url == serverBook.siteUrl }
 
                     if (localBook != null) {
-                        // Book exists on both sides: resolve conflicts
-                        // For now: just log, don't update (to avoid data loss)
-                        Timber.d("Sync: Book exists on both sides: ${serverBook.title}")
+                        // Book exists on both sides: check if server is ahead
+                        val localChapters = bookChaptersRepository.chapters(localBook.url)
+
+                        // Determine local chapter number
+                        val localChapterNumber = if (!localBook.lastReadChapter.isNullOrEmpty()) {
+                            (localChapters.find { it.url == localBook.lastReadChapter }?.position ?: 0) + 1
+                        } else {
+                            (localChapters.filter { it.read }.maxOfOrNull { it.position } ?: -1) + 1
+                        }
+
+                        // Check if server is ahead
+                        if (serverBook.currentChapter > localChapterNumber) {
+                            // Pull: update local book to server's progress
+                            val targetPosition = serverBook.currentChapter - 1  // Convert 1-indexed to 0-indexed
+                            val targetChapter = localChapters.find { it.position == targetPosition }
+
+                            if (targetChapter != null) {
+                                // Target chapter exists locally: mark all chapters up to it as read
+                                val chaptersToMark = localChapters
+                                    .filter { it.position <= targetPosition && !it.read }
+                                    .map { it.url }
+                                if (chaptersToMark.isNotEmpty()) {
+                                    bookChaptersRepository.setAsRead(chaptersToMark)
+                                }
+                                libraryBooksRepository.updateLastReadChapter(localBook.url, targetChapter.url)
+                            } else if (localChapters.isNotEmpty()) {
+                                // Server is further ahead than local chapter list
+                                val chaptersToMark = localChapters.filter { !it.read }.map { it.url }
+                                if (chaptersToMark.isNotEmpty()) {
+                                    bookChaptersRepository.setAsRead(chaptersToMark)
+                                }
+                                val lastLocal = localChapters.maxByOrNull { it.position }
+                                if (lastLocal != null) {
+                                    libraryBooksRepository.updateLastReadChapter(localBook.url, lastLocal.url)
+                                }
+                            }
+
+                            // Update lastReadEpochTimeMilli to server's timestamp to prevent push from regressing
+                            try {
+                                val serverTimestamp = java.time.Instant.parse(serverBook.updatedAt).toEpochMilli()
+                                libraryBooksRepository.updateLastReadEpochTimeMilli(localBook.url, serverTimestamp)
+                            } catch (e: Exception) {
+                                Timber.w(e, "Sync: Failed to parse server timestamp for ${localBook.title}")
+                            }
+
+                            updatedBookUrls.add(localBook.url)
+                            Timber.d("Sync: Updated ${localBook.title} from ch $localChapterNumber to ch ${serverBook.currentChapter}")
+                        }
+
                         merged++
                     } else {
                         // Book only on server: create locally
@@ -327,8 +401,12 @@ class SyncRepository @Inject constructor(
                     }
                 }
 
-                // 4. Push local books to server
-                val pushResponse = pushLibraryToServer(serverUrl, localBooks, apiKey)
+                // 4. Re-fetch local books to get updated timestamps from pull
+                val localBooksForPush = libraryBooksRepository.getAll()
+                    .filter { it.inLibrary && !it.completed }
+
+                // 5. Push local books to server (using cached server chapters to prevent regression)
+                val pushResponse = pushLibraryToServer(serverUrl, localBooksForPush, apiKey, serverChapterCounts)
                 if (pushResponse !is Response.Success) {
                     return@withContext Response.Error("Failed to push to server", Exception())
                 }

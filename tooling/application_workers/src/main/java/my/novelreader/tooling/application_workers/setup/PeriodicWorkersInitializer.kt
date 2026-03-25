@@ -1,6 +1,9 @@
 package my.novelreader.tooling.application_workers.setup
 
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
@@ -21,7 +24,7 @@ class PeriodicWorkersInitializer @Inject constructor(
     private val appPreferences: AppPreferences,
     private val workManager: WorkManager,
     private val appCoroutineScope: AppCoroutineScope
-) {
+) : DefaultLifecycleObserver {
 
     private fun startUpdatesChecker(enabled: Boolean) {
         Timber.d("startUpdatesChecker: called enabled=$enabled")
@@ -58,6 +61,26 @@ class PeriodicWorkersInitializer @Inject constructor(
         )
     }
 
+    // Lifecycle observer for foreground sync
+    override fun onStart(owner: LifecycleOwner) {
+        val serverUrl = appPreferences.SYNC_SERVER_URL.value
+        Timber.d("PeriodicWorkersInitializer.onStart: app came to foreground, serverUrl='$serverUrl'")
+
+        if (serverUrl.isBlank()) {
+            Timber.d("PeriodicWorkersInitializer.onStart: no server URL configured, skipping sync")
+            return
+        }
+
+        val apiKey = appPreferences.SYNC_API_KEY.value
+        Timber.d("PeriodicWorkersInitializer.onStart: triggering sync on app foreground with serverUrl=$serverUrl, apiKey=${if (apiKey.isBlank()) "none" else "***"}")
+        // Enqueue one-time sync work
+        workManager.enqueueUniqueWork(
+            SyncWorker.TAG_MANUAL,
+            ExistingWorkPolicy.REPLACE,
+            SyncWorker.createManualRequest(serverUrl, apiKey)
+        )
+    }
+
     fun init() {
         appCoroutineScope.launch {
             appPreferences.GLOBAL_APP_UPDATER_CHECKER_ENABLED
@@ -79,10 +102,11 @@ class PeriodicWorkersInitializer @Inject constructor(
 
     fun startPeriodicSync(serverUrl: String) {
         Timber.d("startPeriodicSync: called with $serverUrl")
+        val apiKey = appPreferences.SYNC_API_KEY.value
         workManager.enqueueUniquePeriodicWork(
             SyncWorker.TAG,
             ExistingPeriodicWorkPolicy.UPDATE,
-            SyncWorker.createPeriodicRequest(serverUrl),
+            SyncWorker.createPeriodicRequest(serverUrl, apiKey),
         )
     }
 
