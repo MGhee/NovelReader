@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import my.novelreader.feature.local_database.tables.ReadingSession
 import my.novelreader.feature.local_database.BookReadingStats
 import my.novelreader.feature.local_database.DailyReadingStats
+import my.novelreader.feature.local_database.SessionTimestamp
 
 @Dao
 interface ReadingSessionDao {
@@ -47,4 +48,17 @@ interface ReadingSessionDao {
         GROUP BY dayEpoch ORDER BY dayEpoch ASC
     """)
     fun dailyStats(sinceEpochMilli: Long): Flow<List<DailyReadingStats>>
+
+    @Query("SELECT SUM(chaptersRead) FROM ReadingSession WHERE endTimeEpochMilli > 0")
+    fun totalChaptersRead(): Flow<Int?>
+
+    @Query("SELECT AVG(endTimeEpochMilli - startTimeEpochMilli) FROM ReadingSession WHERE endTimeEpochMilli > 0")
+    fun averageSessionDurationMillis(): Flow<Long?>
+
+    @Query("""
+        SELECT startTimeEpochMilli, (endTimeEpochMilli - startTimeEpochMilli) as durationMillis
+        FROM ReadingSession WHERE endTimeEpochMilli > 0 AND startTimeEpochMilli > :sinceEpochMilli
+        ORDER BY startTimeEpochMilli DESC
+    """)
+    fun allSessionTimestamps(sinceEpochMilli: Long): Flow<List<SessionTimestamp>>
 }

@@ -3,10 +3,12 @@ package my.novelreader.data
 import kotlinx.coroutines.flow.Flow
 import my.novelreader.feature.local_database.BookReadingStats
 import my.novelreader.feature.local_database.DailyReadingStats
+import my.novelreader.feature.local_database.SessionTimestamp
 import my.novelreader.feature.local_database.tables.ReadingSession
 import my.novelreader.feature.local_database.DAOs.ReadingSessionDao
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.Calendar
 
 @Singleton
 class ReadingStatsRepository @Inject constructor(
@@ -31,4 +33,24 @@ class ReadingStatsRepository @Inject constructor(
         val since = System.currentTimeMillis() - (sinceDaysAgo.toLong() * 86400000)
         return readingSessionDao.totalChaptersReadSince(since)
     }
+
+    fun chaptersReadToday(): Flow<Int?> {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return readingSessionDao.totalChaptersReadSince(calendar.timeInMillis)
+    }
+
+    fun totalChaptersRead(): Flow<Int?> = readingSessionDao.totalChaptersRead()
+
+    fun averageSessionDuration(): Flow<Long?> = readingSessionDao.averageSessionDurationMillis()
+
+    fun allSessionTimestamps(sinceDaysAgo: Int = 365): Flow<List<SessionTimestamp>> {
+        val since = System.currentTimeMillis() - (sinceDaysAgo.toLong() * 86400000)
+        return readingSessionDao.allSessionTimestamps(since)
+    }
+
+    fun dailyStatsYear(): Flow<List<DailyReadingStats>> = dailyStats(sinceDaysAgo = 365)
 }

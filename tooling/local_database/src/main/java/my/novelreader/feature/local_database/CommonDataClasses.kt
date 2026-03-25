@@ -47,3 +47,8 @@ data class DailyReadingStats(
     val totalTimeMillis: Long,
     val totalChapters: Int,
 )
+
+data class SessionTimestamp(
+    val startTimeEpochMilli: Long,
+    val durationMillis: Long,
+)

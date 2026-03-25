@@ -173,13 +173,22 @@ internal class ReaderSession(
     fun init() {
         initLoadData()
         scope.launch {
-            appRepository.libraryBooks.updateLastReadEpochTimeMilli(
-                bookUrl,
-                System.currentTimeMillis()
-            )
+            try {
+                appRepository.libraryBooks.updateLastReadEpochTimeMilli(
+                    bookUrl,
+                    System.currentTimeMillis()
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("ReaderSession", "Failed to update last read time", e)
+            }
             // Start reading session tracking
-            currentSessionId = appRepository.readingStats.startSession(bookUrl)
-            chaptersReadInSession = 0
+            try {
+                currentSessionId = appRepository.readingStats.startSession(bookUrl)
+                chaptersReadInSession = 0
+                android.util.Log.d("ReaderSession", "Session started: id=$currentSessionId, bookUrl=$bookUrl")
+            } catch (e: Exception) {
+                android.util.Log.e("ReaderSession", "Failed to start reading session", e)
+            }
         }
         initReaderTTSObservers()
     }
@@ -293,8 +302,18 @@ internal class ReaderSession(
         readerTextToSpeech.onClose()
 
         // End reading session - use runBlocking to ensure it completes before scope cancellation
-        runBlocking {
-            appRepository.readingStats.endSession(currentSessionId, chaptersReadInSession)
+        if (currentSessionId > 0) {
+            try {
+                runBlocking {
+                    android.util.Log.d("ReaderSession", "Ending session: id=$currentSessionId, chaptersRead=$chaptersReadInSession")
+                    appRepository.readingStats.endSession(currentSessionId, chaptersReadInSession)
+                }
+                android.util.Log.d("ReaderSession", "Session ended successfully: id=$currentSessionId")
+            } catch (e: Exception) {
+                android.util.Log.e("ReaderSession", "Failed to end reading session", e)
+            }
+        } else {
+            android.util.Log.w("ReaderSession", "No session to end (currentSessionId=0)")
         }
 
         scope.coroutineContext.cancelChildren()
@@ -348,6 +367,7 @@ internal class ReaderSession(
         if (chapterUrl != lastCompletedChapterUrl) {
             lastCompletedChapterUrl = chapterUrl
             chaptersReadInSession++
+            android.util.Log.d("ReaderSession", "Chapter marked as read: $chapterUrl, total chapters in session: $chaptersReadInSession")
         }
         readRoutine.setReadEnd(chapterUrl = chapterUrl)
     }
