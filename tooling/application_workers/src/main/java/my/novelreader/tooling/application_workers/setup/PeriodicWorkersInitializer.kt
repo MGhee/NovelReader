@@ -5,13 +5,16 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import my.novelreader.core.AppCoroutineScope
+import my.novelreader.core.Response
 import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.core.domain.LibraryCategory
+import my.novelreader.data.SyncRepository
 import my.novelreader.tooling.application_workers.LibraryUpdatesWorker
 import my.novelreader.tooling.application_workers.SyncWorker
 import my.novelreader.tooling.application_workers.UpdatesCheckerWorker
@@ -23,8 +26,11 @@ import javax.inject.Singleton
 class PeriodicWorkersInitializer @Inject constructor(
     private val appPreferences: AppPreferences,
     private val workManager: WorkManager,
-    private val appCoroutineScope: AppCoroutineScope
+    private val appCoroutineScope: AppCoroutineScope,
+    private val syncRepository: SyncRepository,
 ) : DefaultLifecycleObserver {
+
+    private var foregroundSyncJob: Job? = null
 
     private fun startUpdatesChecker(enabled: Boolean) {
         Timber.d("startUpdatesChecker: called enabled=$enabled")
@@ -71,14 +77,26 @@ class PeriodicWorkersInitializer @Inject constructor(
             return
         }
 
+        // Skip if a foreground sync is already running
+        if (foregroundSyncJob?.isActive == true) {
+            Timber.d("PeriodicWorkersInitializer.onStart: sync already in progress, skipping")
+            return
+        }
+
         val apiKey = appPreferences.SYNC_API_KEY.value
-        Timber.d("PeriodicWorkersInitializer.onStart: triggering sync on app foreground with serverUrl=$serverUrl, apiKey=${if (apiKey.isBlank()) "none" else "***"}")
-        // Enqueue one-time sync work
-        workManager.enqueueUniqueWork(
-            SyncWorker.TAG_MANUAL,
-            ExistingWorkPolicy.REPLACE,
-            SyncWorker.createManualRequest(serverUrl, apiKey)
-        )
+        Timber.d("PeriodicWorkersInitializer.onStart: triggering direct foreground sync")
+
+        foregroundSyncJob = appCoroutineScope.launch {
+            try {
+                val result = syncRepository.syncWithServer(serverUrl, apiKey)
+                when (result) {
+                    is Response.Success -> Timber.d("Foreground sync successful: ${result.data}")
+                    is Response.Error -> Timber.e(result.exception, "Foreground sync error: ${result.message}")
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Foreground sync unexpected error")
+            }
+        }
     }
 
     fun init() {

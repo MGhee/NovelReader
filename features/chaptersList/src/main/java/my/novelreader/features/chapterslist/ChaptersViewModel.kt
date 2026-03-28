@@ -16,6 +16,7 @@ import my.novelreader.coreui.BaseViewModel
 import my.novelreader.data.AppRepository
 import my.novelreader.data.DownloaderRepository
 import my.novelreader.data.EpubImporterRepository
+import my.novelreader.interactor.WorkersInteractions
 import my.novelreader.chapterslist.R
 import my.novelreader.core.AppCoroutineScope
 import my.novelreader.core.AppFileResolver
@@ -40,11 +41,12 @@ internal class ChaptersViewModel @Inject constructor(
     private val appScope: AppCoroutineScope,
     scraper: Scraper,
     private val toasty: Toasty,
-    appPreferences: AppPreferences,
+    private val appPreferences: AppPreferences,
     appFileResolver: AppFileResolver,
     private val downloaderRepository: DownloaderRepository,
     private val chaptersRepository: ChaptersRepository,
     private val epubImporterRepository: EpubImporterRepository,
+    private val workersInteractions: WorkersInteractions,
     stateHandle: SavedStateHandle,
 ) : BaseViewModel(), ChapterStateBundle {
 
@@ -175,6 +177,10 @@ internal class ChaptersViewModel @Inject constructor(
                     if (it.isEmpty())
                         toasty.show(R.string.no_chapters_found)
                     appRepository.bookChapters.merge(newChapters = it, bookUrl = url)
+                    // Auto-download new chapters for library books
+                    if (appRepository.libraryBooks.existInLibrary(url)) {
+                        workersInteractions.downloadAllBookChapters(url)
+                    }
                 }.onError {
                     state.error.value = it.message
                 }

@@ -848,6 +848,7 @@ class ReaderActivity : BaseActivity() {
     private fun snapToPosition(position: Int) {
         if (position != -1) {
             val layoutManager = viewBind.readerView.layoutManager as my.novelreader.features.reader.view.ReaderLayoutManager
+            viewBind.readerView.stopScroll()
             isSnapping = true
             layoutManager.scrollToPositionWithOffset(position, 0)
             viewBind.readerView.post { isSnapping = false }
