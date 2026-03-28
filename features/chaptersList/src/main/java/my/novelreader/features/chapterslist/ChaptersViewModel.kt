@@ -236,19 +236,24 @@ internal class ChaptersViewModel @Inject constructor(
 
     fun downloadSelected() {
         if (state.isLocalSource.value) return
-        
+
         // Get selected chapter URLs
         val selectedUrls = state.selectedChaptersUrl.keys.toSet()
-        
+
         // Filter and sort chapters by position to ensure sequential download
         val sortedChapters = state.chapters
             .filter { selectedUrls.contains(it.chapter.url) }
             .sortedBy { it.chapter.position }
-        
+
         // Download chapters sequentially in order
         appScope.launch(Dispatchers.Default) {
+            var failed = 0
             sortedChapters.forEach { chapter ->
                 appRepository.chapterBody.fetchBody(chapter.chapter.url)
+                    .onError { failed++ }
+            }
+            if (failed > 0) {
+                toasty.show("Download failed for $failed chapters")
             }
         }
     }
@@ -258,6 +263,7 @@ internal class ChaptersViewModel @Inject constructor(
         val list = state.selectedChaptersUrl.toList()
         appScope.launch(Dispatchers.Default) {
             appRepository.chapterBody.removeRows(list.map { it.first })
+            toasty.show(R.string.chapters_deleted)
         }
     }
 
@@ -309,6 +315,8 @@ internal class ChaptersViewModel @Inject constructor(
         if (state.isLocalSource.value) return
         appScope.launch {
             appRepository.chapterBody.fetchBody(chapter.chapter.url)
+                .onSuccess { toasty.show(R.string.chapter_downloaded) }
+                .onError { toasty.show(R.string.chapter_download_failed) }
         }
     }
 

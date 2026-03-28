@@ -31,11 +31,11 @@ internal class SyncWorker @AssistedInject constructor(
         const val TAG = "Sync"
         const val TAG_MANUAL = "SyncManual"
         private const val DATA_SERVER_URL = "serverUrl"
-        private const val DATA_API_KEY = "apiKey"
+        private const val DATA_AUTH_TOKEN = "authToken"
 
         fun createPeriodicRequest(
             serverUrl: String,
-            apiKey: String = "",
+            authToken: String = "",
             repeatIntervalHours: Int = 24,
         ): PeriodicWorkRequest {
             val builder = PeriodicWorkRequestBuilder<SyncWorker>(
@@ -51,32 +51,32 @@ internal class SyncWorker @AssistedInject constructor(
                 .addTag(TAG)
                 .setConstraints(constraints)
                 .setInitialDelay(30, TimeUnit.MINUTES)
-                .setInputData(createInputData(serverUrl, apiKey))
+                .setInputData(createInputData(serverUrl, authToken))
                 .build()
         }
 
-        fun createManualRequest(serverUrl: String, apiKey: String = ""): OneTimeWorkRequest {
+        fun createManualRequest(serverUrl: String, authToken: String = ""): OneTimeWorkRequest {
             return OneTimeWorkRequestBuilder<SyncWorker>()
                 .addTag(TAG_MANUAL)
-                .setInputData(createInputData(serverUrl, apiKey))
+                .setInputData(createInputData(serverUrl, authToken))
                 .build()
         }
 
-        private fun createInputData(serverUrl: String, apiKey: String) = Data.Builder()
+        private fun createInputData(serverUrl: String, authToken: String) = Data.Builder()
             .putString(DATA_SERVER_URL, serverUrl)
-            .putString(DATA_API_KEY, apiKey)
+            .putString(DATA_AUTH_TOKEN, authToken)
             .build()
     }
 
     override suspend fun doWork(): Result {
         val serverUrl = inputData.getString(DATA_SERVER_URL) ?: return Result.failure()
-        val apiKey = inputData.getString(DATA_API_KEY) ?: ""
+        val authToken = inputData.getString(DATA_AUTH_TOKEN) ?: ""
 
         Timber.d("SyncWorker: starting sync with $serverUrl")
 
         return try {
             withContext(Dispatchers.IO) {
-                val result = syncRepository.syncWithServer(serverUrl, apiKey)
+                val result = syncRepository.syncWithServer(serverUrl, authToken)
 
                 when (result) {
                     is Response.Success -> {

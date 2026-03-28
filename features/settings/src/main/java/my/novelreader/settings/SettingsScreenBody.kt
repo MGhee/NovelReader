@@ -51,7 +51,8 @@ internal fun SettingsScreenBody(
     onGeminiApiKeyChange: (String) -> Unit,
     onGeminiModelChange: (String) -> Unit,
     onPreferOnlineChange: (Boolean) -> Unit,
-    onSyncApiKeyChange: (String) -> Unit,
+    onSignInWithGoogle: () -> Unit = {},
+    onSignOut: () -> Unit = {},
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
@@ -69,8 +70,11 @@ internal fun SettingsScreenBody(
             onCleanDatabase = onCleanDatabase,
             onCleanImageFolder = onCleanImageFolder,
             onSyncWithServer = onSyncWithServer,
-            syncApiKey = state.syncApiKey.value,
-            onSyncApiKeyChange = onSyncApiKeyChange
+            isLoggedIn = state.isLoggedIn.value,
+            syncUserEmail = state.syncUserEmail.value,
+            onSignInWithGoogle = onSignInWithGoogle,
+            onSignOut = onSignOut,
+            isSyncSigningIn = state.isSyncSigningIn.value,
         )
         HorizontalDivider()
         SettingsBackup(
@@ -151,7 +155,10 @@ private fun Preview() {
                     geminiModel = remember { derivedStateOf { "" } },
                     preferOnlineTranslation = remember { derivedStateOf { false } },
                         syncServerUrl = remember { derivedStateOf { "https://novelapp.viktorbarzin.me" } },
-                        syncApiKey = remember { derivedStateOf { "" } },
+                        isLoggedIn = remember { derivedStateOf { false } },
+                        syncUserEmail = remember { derivedStateOf { "" } },
+                        syncUserDisplayName = remember { derivedStateOf { "" } },
+                        isSyncSigningIn = remember { mutableStateOf(false) },
                 ),
                 onFollowSystem = { },
                 onThemeSelected = { },
@@ -166,7 +173,8 @@ private fun Preview() {
                 onGeminiApiKeyChange = { },
                 onGeminiModelChange = { },
                 onPreferOnlineChange = { },
-                onSyncApiKeyChange = { },
+                onSignInWithGoogle = { },
+                onSignOut = { },
             )
         }
     }

@@ -64,14 +64,14 @@ class SyncRepository @Inject constructor(
     // Cache of server chapter counts to prevent pushing lower chapters
     private val serverChapterCounts = mutableMapOf<String, Int>()
 
-    suspend fun fetchLibraryFromServer(serverUrl: String, apiKey: String = ""): Response<List<SyncBook>> =
+    suspend fun fetchLibraryFromServer(serverUrl: String, authToken: String = ""): Response<List<SyncBook>> =
         withContext(Dispatchers.IO) {
             try {
                 val url = "$serverUrl/api/sync/library"
                 Timber.d("SyncRepository: fetching library from $url")
 
                 val requestBuilder = Request.Builder().url(url)
-                if (apiKey.isNotBlank()) requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+                if (authToken.isNotBlank()) requestBuilder.addHeader("Authorization", "Bearer $authToken")
                 val request = requestBuilder.build()
 
                 val client = (networkClient as? ScraperNetworkClient)?.client
@@ -86,6 +86,10 @@ class SyncRepository @Inject constructor(
 
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: ""
+                    if (response.code == 401) {
+                        Timber.e("SyncRepository: Authentication failed")
+                        return@withContext Response.Error("Authentication expired. Please sign in again.", Exception())
+                    }
                     Timber.e("SyncRepository: Server error ${response.code}: $errorBody")
                     return@withContext Response.Error("Server error: ${response.code}", Exception())
                 }
@@ -165,7 +169,7 @@ class SyncRepository @Inject constructor(
     suspend fun pushLibraryToServer(
         serverUrl: String,
         localBooks: List<Book>,
-        apiKey: String = "",
+        authToken: String = "",
         serverChapterCounts: Map<String, Int> = emptyMap()
     ): Response<SyncResponse> =
         withContext(Dispatchers.IO) {
@@ -208,7 +212,7 @@ class SyncRepository @Inject constructor(
                 val jsonBody = jsonPayload.toString().toRequestBody("application/json".toMediaType())
 
                 val requestBuilder = Request.Builder().url("$serverUrl/api/sync/push").post(jsonBody)
-                if (apiKey.isNotBlank()) requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+                if (authToken.isNotBlank()) requestBuilder.addHeader("Authorization", "Bearer $authToken")
                 val request = requestBuilder.build()
 
                 val client = (networkClient as? ScraperNetworkClient)?.client ?: return@withContext Response.Error("Invalid network client", Exception())
@@ -216,6 +220,10 @@ class SyncRepository @Inject constructor(
 
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: ""
+                    if (response.code == 401) {
+                        Timber.e("SyncRepository: Authentication failed")
+                        return@withContext Response.Error("Authentication expired. Please sign in again.", Exception())
+                    }
                     Timber.e("SyncRepository: Push failed ${response.code}: $errorBody")
                     return@withContext Response.Error("Server error: ${response.code}", Exception())
                 }
@@ -233,7 +241,7 @@ class SyncRepository @Inject constructor(
     suspend fun pushSingleBookToServer(
         serverUrl: String,
         bookUrl: String,
-        apiKey: String = ""
+        authToken: String = ""
     ): Response<SyncResponse> =
         withContext(Dispatchers.IO) {
             try {
@@ -282,13 +290,17 @@ class SyncRepository @Inject constructor(
                 val jsonBody = jsonPayload.toString().toRequestBody("application/json".toMediaType())
 
                 val requestBuilder = Request.Builder().url("$serverUrl/api/sync/push").post(jsonBody)
-                if (apiKey.isNotBlank()) requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+                if (authToken.isNotBlank()) requestBuilder.addHeader("Authorization", "Bearer $authToken")
                 val request = requestBuilder.build()
 
                 val client = (networkClient as? ScraperNetworkClient)?.client ?: return@withContext Response.Error("Invalid network client", Exception())
                 val response = client.newCall(request).execute()
 
                 if (!response.isSuccessful) {
+                    if (response.code == 401) {
+                        Timber.e("SyncRepository: Authentication failed")
+                        return@withContext Response.Error("Authentication expired. Please sign in again.", Exception())
+                    }
                     Timber.e("SyncRepository: Push failed, code=${response.code}")
                     return@withContext Response.Error("Server error: ${response.code}", Exception())
                 }
@@ -307,14 +319,14 @@ class SyncRepository @Inject constructor(
     /**
      * Full sync: fetch server state, compare with local, merge conflicts (max chapter wins).
      */
-    suspend fun syncWithServer(serverUrl: String, apiKey: String = ""): Response<String> =
+    suspend fun syncWithServer(serverUrl: String, authToken: String = ""): Response<String> =
         withContext(Dispatchers.IO) {
             try {
                 // 1. Get local library (only currently-reading books, exclude completed)
                 val localBooks = libraryBooksRepository.getAll().filter { it.inLibrary && !it.completed }
 
                 // 2. Fetch server state
-                val serverBooksResponse = fetchLibraryFromServer(serverUrl, apiKey)
+                val serverBooksResponse = fetchLibraryFromServer(serverUrl, authToken)
                 if (serverBooksResponse !is Response.Success) {
                     return@withContext Response.Error("Failed to fetch server state", Exception())
                 }
@@ -406,7 +418,7 @@ class SyncRepository @Inject constructor(
                     .filter { it.inLibrary && !it.completed }
 
                 // 5. Push local books to server (using cached server chapters to prevent regression)
-                val pushResponse = pushLibraryToServer(serverUrl, localBooksForPush, apiKey, serverChapterCounts)
+                val pushResponse = pushLibraryToServer(serverUrl, localBooksForPush, authToken, serverChapterCounts)
                 if (pushResponse !is Response.Success) {
                     return@withContext Response.Error("Failed to push to server", Exception())
                 }

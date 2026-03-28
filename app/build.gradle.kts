@@ -180,7 +180,6 @@ dependencies {
     implementation(libs.hilt.workmanager)
 
     // HTML text extractor
-    implementation(libs.crux)
     implementation(libs.readability4j)
     implementation(libs.jsoup)
 

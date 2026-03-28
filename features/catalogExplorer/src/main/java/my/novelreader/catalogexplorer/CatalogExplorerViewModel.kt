@@ -15,12 +15,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import my.novelreader.algorithms.sortedByFuzzyMatch
 import my.novelreader.core.LanguageCode
+import my.novelreader.core.Response
 import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.core.utils.toState
 import my.novelreader.coreui.BaseViewModel
 import my.novelreader.coreui.states.PagedListIteratorState
 import my.novelreader.data.CatalogItem
 import my.novelreader.data.ScraperRepository
+import my.novelreader.scraper.SourceInterface
 import my.novelreader.scraper.domain.BookResult
 import javax.inject.Inject
 
@@ -45,6 +47,10 @@ internal class CatalogExplorerViewModel @Inject constructor(
     // Popular books cache (lazy-loaded per source)
     private val _popularBooksCache = mutableMapOf<String, PagedListIteratorState<BookResult>>()
     private val _semaphore = Semaphore(3) // Limit concurrent fetches to 3
+
+    // Cover URL cache: maps bookUrl -> resolved cover URL
+    private val _coverUrlCache = mutableMapOf<String, String>()
+    private val _coverFetchSemaphore = Semaphore(5) // Limit concurrent cover fetches to 5
 
     // Search debounce
     private var searchJob: Job? = null
@@ -81,6 +87,22 @@ internal class CatalogExplorerViewModel @Inject constructor(
         }
     }
 
+    suspend fun getOrFetchCoverUrl(catalog: SourceInterface.Catalog, bookUrl: String): String? {
+        _coverUrlCache[bookUrl]?.let { return it }
+        _coverFetchSemaphore.acquire()
+        try {
+            // Double-check after acquiring semaphore
+            _coverUrlCache[bookUrl]?.let { return it }
+            val result = (catalog.getBookCoverImageUrl(bookUrl) as? Response.Success)?.data
+            if (result != null) {
+                _coverUrlCache[bookUrl] = result
+            }
+            return result
+        } finally {
+            _coverFetchSemaphore.release()
+        }
+    }
+
     fun onSearchTextChange(text: String) {
         searchTextInput = text
         searchJob?.cancel()
@@ -106,7 +128,15 @@ internal class CatalogExplorerViewModel @Inject constructor(
                 catalogItem.catalog.getCatalogSearch(index, query)
             }
             searchResults.add(SourceSearchResult(catalogItem, iterator))
-            iterator.fetchNext()
+            // Use semaphore to limit concurrent search fetches
+            viewModelScope.launch {
+                _semaphore.acquire()
+                try {
+                    iterator.fetchNext()
+                } finally {
+                    _semaphore.release()
+                }
+            }
         }
     }
 }

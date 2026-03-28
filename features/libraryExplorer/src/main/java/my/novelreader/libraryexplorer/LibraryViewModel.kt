@@ -95,7 +95,11 @@ internal class LibraryViewModel @Inject constructor(
 
     fun bookCompletedToggle(bookUrl: String) {
         viewModelScope.launch {
-            val book = appRepository.libraryBooks.get(bookUrl) ?: return@launch
+            val book = appRepository.libraryBooks.get(bookUrl)
+            if (book == null) {
+                toasty.show(R.string.failed_to_update_book)
+                return@launch
+            }
             appRepository.libraryBooks.update(book.copy(completed = !book.completed))
         }
     }
@@ -135,19 +139,25 @@ internal class LibraryViewModel @Inject constructor(
             toasty.show(R.string.downloading_all_chapters_started)
 
             var downloaded = 0
+            var failed = 0
             chapters.forEach { chapter ->
                 appRepository.chapterBody.fetchBody(chapter.url)
-                downloaded++
+                    .onSuccess { downloaded++ }
+                    .onError { failed++ }
 
                 // Update progress map
                 downloadProgress = downloadProgress.toMutableMap().apply {
-                    put(bookUrl, Pair(downloaded, chapters.size))
+                    put(bookUrl, Pair(downloaded + failed, chapters.size))
                 }
             }
 
             // Clear progress when done
             downloadProgress = downloadProgress.toMutableMap().apply {
                 remove(bookUrl)
+            }
+
+            if (failed > 0) {
+                toasty.show("Downloaded $downloaded, failed $failed chapters")
             }
         }
     }
@@ -165,6 +175,7 @@ internal class LibraryViewModel @Inject constructor(
                 val bookFolder = java.io.File(appFileResolver.folderBooks, localFolderName)
                 if (bookFolder.exists()) bookFolder.deleteRecursively()
             } catch (_: Exception) {
+                // Silently ignore file deletion errors
             }
 
             toasty.show(R.string.delete_downloaded_chapters)
@@ -184,6 +195,7 @@ internal class LibraryViewModel @Inject constructor(
                 val bookFolder = java.io.File(appFileResolver.folderBooks, localFolderName)
                 if (bookFolder.exists()) bookFolder.deleteRecursively()
             } catch (_: Exception) {
+                // Silently ignore file deletion errors
             }
 
             toasty.show(R.string.delete_downloaded_chapters)
@@ -193,19 +205,25 @@ internal class LibraryViewModel @Inject constructor(
             toasty.show(R.string.downloading_all_chapters_started)
 
             var downloaded = 0
+            var failed = 0
             chaptersToDownload.forEach { chapter ->
                 appRepository.chapterBody.fetchBody(chapter.url)
-                downloaded++
+                    .onSuccess { downloaded++ }
+                    .onError { failed++ }
 
                 // Update progress map
                 downloadProgress = downloadProgress.toMutableMap().apply {
-                    put(bookUrl, Pair(downloaded, chaptersToDownload.size))
+                    put(bookUrl, Pair(downloaded + failed, chaptersToDownload.size))
                 }
             }
 
             // Clear progress when done
             downloadProgress = downloadProgress.toMutableMap().apply {
                 remove(bookUrl)
+            }
+
+            if (failed > 0) {
+                toasty.show("Downloaded $downloaded, failed $failed chapters")
             }
         }
     }
@@ -224,6 +242,7 @@ internal class LibraryViewModel @Inject constructor(
                 val bookFolder = File(appFileResolver.folderBooks, localFolderName)
                 if (bookFolder.exists()) bookFolder.deleteRecursively()
             } catch (_: Exception) {
+                // Silently ignore file deletion errors
             }
 
             appRepository.libraryBooks.remove(bookUrl)

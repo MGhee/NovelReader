@@ -20,7 +20,10 @@ data class SettingsScreenState(
     val geminiModel: State<String>,
     val preferOnlineTranslation: State<Boolean>,
     val syncServerUrl: State<String>,
-    val syncApiKey: State<String>,
+    val isLoggedIn: State<Boolean>,
+    val syncUserEmail: State<String>,
+    val syncUserDisplayName: State<String>,
+    val isSyncSigningIn: MutableState<Boolean>,
 ) {
     data class UpdateApp(
         val currentAppVersion: String,

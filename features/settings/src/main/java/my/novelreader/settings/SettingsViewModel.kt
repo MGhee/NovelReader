@@ -19,9 +19,13 @@ import my.novelreader.coreui.mappers.toTheme
 import my.novelreader.coreui.theme.Themes
 import my.novelreader.data.AppRemoteRepository
 import my.novelreader.data.AppRepository
+import my.novelreader.data.auth.GoogleAuthManager
+import my.novelreader.data.auth.GoogleAuthResult
+import my.novelreader.data.auth.SessionManager
 import my.novelreader.core.AppCoroutineScope
 import my.novelreader.core.AppFileResolver
 import my.novelreader.core.Toasty
+import my.novelreader.core.Response
 import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.core.utils.asMutableStateOf
 import my.novelreader.text_translator.domain.TranslationManager
@@ -41,9 +45,13 @@ internal class SettingsViewModel @Inject constructor(
     private val appRemoteRepository: AppRemoteRepository,
     private val toasty: Toasty,
     private val workersInteractions: WorkersInteractions,
+    private val googleAuthManager: GoogleAuthManager,
+    private val sessionManager: SessionManager,
 ) : BaseViewModel() {
 
     private val themeId by appPreferences.THEME_ID.state(viewModelScope)
+
+    private val syncSessionTokenState = appPreferences.SYNC_SESSION_TOKEN.state(viewModelScope)
 
     val state = SettingsScreenState(
         databaseSize = stateHandle.asMutableStateOf("databaseSize") { "" },
@@ -75,7 +83,10 @@ internal class SettingsViewModel @Inject constructor(
         geminiModel = appPreferences.TRANSLATION_GEMINI_MODEL.state(viewModelScope),
         preferOnlineTranslation = appPreferences.TRANSLATION_PREFER_ONLINE.state(viewModelScope),
         syncServerUrl = appPreferences.SYNC_SERVER_URL.state(viewModelScope),
-        syncApiKey = appPreferences.SYNC_API_KEY.state(viewModelScope),
+        isLoggedIn = derivedStateOf { syncSessionTokenState.value.isNotBlank() },
+        syncUserEmail = appPreferences.SYNC_USER_EMAIL.state(viewModelScope),
+        syncUserDisplayName = appPreferences.SYNC_USER_DISPLAY_NAME.state(viewModelScope),
+        isSyncSigningIn = mutableStateOf(false),
     )
 
     init {
@@ -120,9 +131,9 @@ internal class SettingsViewModel @Inject constructor(
 
     fun syncWithServer() {
         val serverUrl = appPreferences.SYNC_SERVER_URL.value
-        val apiKey = appPreferences.SYNC_API_KEY.value
+        val authToken = sessionManager.getEffectiveToken()
         toasty.show("Syncing with $serverUrl...")
-        workersInteractions.syncWithServer(serverUrl, apiKey)
+        workersInteractions.syncWithServer(serverUrl, authToken)
     }
 
     fun onSyncServerUrlChange(url: String) {
@@ -145,8 +156,50 @@ internal class SettingsViewModel @Inject constructor(
         appPreferences.TRANSLATION_GEMINI_MODEL.value = model
     }
 
-    fun onSyncApiKeyChange(apiKey: String) {
-        appPreferences.SYNC_API_KEY.value = apiKey
+    fun onSignInWithGoogle(activityContext: Context) {
+        state.isSyncSigningIn.value = true
+        viewModelScope.launch {
+            val serverUrl = appPreferences.SYNC_SERVER_URL.value
+            if (serverUrl.isBlank()) {
+                toasty.show("Sync server URL not configured")
+                state.isSyncSigningIn.value = false
+                return@launch
+            }
+
+            val webClientId = appPreferences.SYNC_GOOGLE_WEB_CLIENT_ID.value
+            if (webClientId.isBlank()) {
+                toasty.show("Google OAuth not configured")
+                state.isSyncSigningIn.value = false
+                return@launch
+            }
+
+            val signInResult = withContext(Dispatchers.Default) {
+                googleAuthManager.signIn(activityContext, webClientId)
+            }
+
+            when (signInResult) {
+                is GoogleAuthResult.Success -> {
+                    val exchangeResult = sessionManager.exchangeGoogleToken(serverUrl, signInResult.idToken)
+                    when (exchangeResult) {
+                        is Response.Success -> {
+                            toasty.show("Signed in as ${signInResult.email}")
+                        }
+                        is Response.Error -> {
+                            toasty.show("Failed to authenticate: ${exchangeResult.message}")
+                        }
+                    }
+                }
+                is GoogleAuthResult.Error -> {
+                    toasty.show("Sign-in failed: ${signInResult.message}")
+                }
+            }
+            state.isSyncSigningIn.value = false
+        }
+    }
+
+    fun onSignOut() {
+        sessionManager.logout()
+        toasty.show("Signed out")
     }
 
     fun onPreferOnlineTranslationChange(prefer: Boolean) {

@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import my.novelreader.coreui.BaseViewModel
 import my.novelreader.coreui.mappers.toTheme
 import my.novelreader.core.appPreferences.AppPreferences
+import my.novelreader.core.Toasty
 import my.novelreader.core.utils.StateExtra_Boolean
 import my.novelreader.core.utils.StateExtra_String
 import my.novelreader.core.utils.toState
@@ -21,6 +22,7 @@ import my.novelreader.features.reader.domain.ChapterState
 import my.novelreader.features.reader.manager.ReaderManager
 import my.novelreader.features.reader.ui.ReaderScreenState
 import my.novelreader.features.reader.ui.ReaderViewHandlersActions
+import my.novelreader.reader.R
 import javax.inject.Inject
 import kotlin.properties.Delegates
 
@@ -37,6 +39,7 @@ internal class ReaderViewModel @Inject constructor(
     private val appRepository: AppRepository,
     private val readerManager: ReaderManager,
     readerViewHandlersActions: ReaderViewHandlersActions,
+    private val toasty: Toasty,
 ) : BaseViewModel(), ReaderStateBundle {
 
     override var bookUrl by StateExtra_String(stateHandler)
@@ -171,6 +174,8 @@ internal class ReaderViewModel @Inject constructor(
     fun downloadChapterFromList(chapterUrl: String) {
         viewModelScope.launch {
             appRepository.chapterBody.fetchBody(chapterUrl)
+                .onSuccess { toasty.show(R.string.chapter_downloaded) }
+                .onError { toasty.show(R.string.chapter_download_failed) }
         }
     }
 
@@ -196,8 +201,16 @@ internal class ReaderViewModel @Inject constructor(
 
     fun downloadAllChapters() {
         viewModelScope.launch {
-            chaptersInBook.value.forEach { chapter ->
+            var failed = 0
+            val chapters = chaptersInBook.value
+            chapters.forEach { chapter ->
                 appRepository.chapterBody.fetchBody(chapter.chapter.url)
+                    .onError { failed++ }
+            }
+            if (failed > 0) {
+                toasty.show("Download failed for $failed chapters")
+            } else if (chapters.isNotEmpty()) {
+                toasty.show(R.string.chapters_deleted)
             }
         }
     }
@@ -207,6 +220,7 @@ internal class ReaderViewModel @Inject constructor(
             val chapterUrls = chaptersInBook.value.map { it.chapter.url }
             if (chapterUrls.isNotEmpty()) {
                 appRepository.chapterBody.removeRows(chapterUrls)
+                toasty.show(R.string.chapters_deleted)
             }
         }
     }

@@ -93,7 +93,6 @@ class Novelku(private val networkClient: NetworkClient) : SourceInterface.Catalo
 
     override suspend fun getChapterList(bookUrl: String) =
         withContext(Dispatchers.Default) {
-            // var url = postRequest(url = bookUrl.toUrlBuilderSafe().addPath("ajax", "chapters").toString())
             val postData =
                 postRequest(url = bookUrl.toUrlBuilderSafe().addPath("ajax", "chapters").toString())
             tryConnect {

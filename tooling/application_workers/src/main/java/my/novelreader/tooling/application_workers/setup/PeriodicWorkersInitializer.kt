@@ -83,12 +83,20 @@ class PeriodicWorkersInitializer @Inject constructor(
             return
         }
 
-        val apiKey = appPreferences.SYNC_API_KEY.value
+        // Use session token, fall back to API key for backward compat
+        val authToken = appPreferences.SYNC_SESSION_TOKEN.value.ifBlank {
+            appPreferences.SYNC_API_KEY.value
+        }
+        if (authToken.isBlank()) {
+            Timber.d("PeriodicWorkersInitializer.onStart: no auth token, skipping sync")
+            return
+        }
+
         Timber.d("PeriodicWorkersInitializer.onStart: triggering direct foreground sync")
 
         foregroundSyncJob = appCoroutineScope.launch {
             try {
-                val result = syncRepository.syncWithServer(serverUrl, apiKey)
+                val result = syncRepository.syncWithServer(serverUrl, authToken)
                 when (result) {
                     is Response.Success -> Timber.d("Foreground sync successful: ${result.data}")
                     is Response.Error -> Timber.e(result.exception, "Foreground sync error: ${result.message}")
@@ -120,11 +128,14 @@ class PeriodicWorkersInitializer @Inject constructor(
 
     fun startPeriodicSync(serverUrl: String) {
         Timber.d("startPeriodicSync: called with $serverUrl")
-        val apiKey = appPreferences.SYNC_API_KEY.value
+        // Use session token, fall back to API key for backward compat
+        val authToken = appPreferences.SYNC_SESSION_TOKEN.value.ifBlank {
+            appPreferences.SYNC_API_KEY.value
+        }
         workManager.enqueueUniquePeriodicWork(
             SyncWorker.TAG,
             ExistingPeriodicWorkPolicy.UPDATE,
-            SyncWorker.createPeriodicRequest(serverUrl, apiKey),
+            SyncWorker.createPeriodicRequest(serverUrl, authToken),
         )
     }
 

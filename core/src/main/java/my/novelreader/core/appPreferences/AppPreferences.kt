@@ -237,20 +237,30 @@ class AppPreferences @Inject constructor(
             override var value by SharedPreference_String(name, preferences, "")
         }
 
-    @Deprecated("Removed", level = DeprecationLevel.HIDDEN)
-    val LOCAL_SOURCES_URI_DIRECTORIES =
-        object : Preference<Set<String>>("LOCAL_SOURCES_URI_DIRECTORIES") {
-            override var value by SharedPreference_StringSet(name, preferences, setOf())
+    val SYNC_SESSION_TOKEN =
+        object : Preference<String>("SYNC_SESSION_TOKEN") {
+            override var value by SharedPreference_String(name, preferences, "")
         }
 
-    @Deprecated("Removed", level = DeprecationLevel.HIDDEN)
-    val LIBRARY_SORT_READ = object : Preference<TernaryState>("LIBRARY_SORT_READ") {
-        override var value by SharedPreference_Enum(
-            name,
-            preferences,
-            TernaryState.Active
-        ) { enumValueOf(it) }
-    }
+    val SYNC_USER_EMAIL =
+        object : Preference<String>("SYNC_USER_EMAIL") {
+            override var value by SharedPreference_String(name, preferences, "")
+        }
+
+    val SYNC_USER_DISPLAY_NAME =
+        object : Preference<String>("SYNC_USER_DISPLAY_NAME") {
+            override var value by SharedPreference_String(name, preferences, "")
+        }
+
+    val SYNC_USER_PHOTO_URL =
+        object : Preference<String>("SYNC_USER_PHOTO_URL") {
+            override var value by SharedPreference_String(name, preferences, "")
+        }
+
+    val SYNC_GOOGLE_WEB_CLIENT_ID =
+        object : Preference<String>("SYNC_GOOGLE_WEB_CLIENT_ID") {
+            override var value by SharedPreference_String(name, preferences, "982186971214-01mnife8l7tauss1seu1olv3vap99pab.apps.googleusercontent.com")
+        }
 
     abstract inner class Preference<T>(val name: String) {
         abstract var value: T

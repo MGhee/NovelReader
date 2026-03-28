@@ -27,7 +27,6 @@ class BoxNovel(
     override val selectCatalogItemTitle = ".novel-title a"
     override val selectCatalogItemCover = "div.col-xs-3 > div > img"
 
-    //override val selectSearchItems: String = "#list-page .row"
     override val selectSearchItemTitle: String = ".novel-title a"
     override val selectSearchItemUrl: String = "a[href]"
     override val selectSearchItemCover: String = "div.col-xs-3 > div > img"

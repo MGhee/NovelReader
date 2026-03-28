@@ -236,4 +236,8 @@
     <string name="all_chapters_already_downloaded">All chapters are already downloaded</string>
     <string name="theme_name_dark_teal">Dark teal</string>
     <string name="theme_name_sepia">Sepia</string>
+    <string name="chapter_downloaded">Chapter downloaded</string>
+    <string name="chapter_download_failed">Failed to download chapter</string>
+    <string name="chapters_deleted">Downloaded chapters deleted</string>
+    <string name="failed_to_update_book">Failed to update book</string>
 </resources>

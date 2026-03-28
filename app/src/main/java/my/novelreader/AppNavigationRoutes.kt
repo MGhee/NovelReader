@@ -80,10 +80,4 @@ class AppNavigationRoutes @Inject constructor() : NavigationRoutes {
     override fun webView(context: Context, url: String): Intent {
         return WebViewActivity.IntentData(context, url = url)
     }
-
 }
-
-//@Singleton
-//class AppNavigationRoutesViewModel @Inject constructor(
-//    private val appNavigationRoutes: AppNavigationRoutes
-//) : NavigationRouteViewModel(), NavigationRoutes by appNavigationRoutes

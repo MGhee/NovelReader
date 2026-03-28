@@ -52,8 +52,7 @@ internal fun SourcePopularCarousel(
             start = 8.dp,
             end = 30.dp,
         ),
-        modifier = modifier
-            .animateContentSize(),
+        modifier = modifier,
     ) {
         items(fetchIterator.list) {
             val interactionSource = remember { MutableInteractionSource() }

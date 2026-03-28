@@ -91,13 +91,15 @@ internal class ReaderSession(
     private fun syncOnChapterChange() {
         val serverUrl = appPreferences.SYNC_SERVER_URL.value
         if (serverUrl.isBlank()) return
-        val apiKey = appPreferences.SYNC_API_KEY.value
+        val authToken = appPreferences.SYNC_SESSION_TOKEN.value.ifBlank {
+            appPreferences.SYNC_API_KEY.value
+        }
         scope.launch(Dispatchers.IO) {
             delay(1000) // Ensure position save completes before reading from DB
             syncRepository.pushSingleBookToServer(
                 serverUrl = serverUrl,
                 bookUrl = bookUrl,
-                apiKey = apiKey
+                authToken = authToken
             )
         }
     }

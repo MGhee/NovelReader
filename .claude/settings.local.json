@@ -4,7 +4,12 @@
       "Bash(find b:/NovelReader -name *.kt -path */libraryExplorer/* -o -path */reader/ReaderViewModel.kt -o -path */reader/ReaderActivity.kt)",
       "Bash(xargs wc:*)",
       "WebFetch(domain:novelbin.com)",
-      "WebFetch(domain:novelbin.me)"
+      "WebFetch(domain:novelbin.me)",
+      "Read(//b/NovelApp/**)",
+      "Bash(npm install:*)"
+    ],
+    "additionalDirectories": [
+      "B:\\NovelApp\\src"
     ]
   }
 }
