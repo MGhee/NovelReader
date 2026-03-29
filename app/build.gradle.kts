@@ -60,14 +60,9 @@ android {
 
     buildTypes {
 
-        signingConfigs.asMap["default"]?.let {
-            all {
-                signingConfig = it
-            }
-        }
-
         named("debug") {
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
             postprocessing {
                 isRemoveUnusedCode = false
                 isObfuscate = false
@@ -77,6 +72,7 @@ android {
         }
 
         named("release") {
+            signingConfigs.asMap["default"]?.let { signingConfig = it }
             postprocessing {
                 proguardFile("proguard-rules.pro")
                 isRemoveUnusedCode = true
