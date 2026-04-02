@@ -61,7 +61,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import my.nanihadesuka.compose.InternalLazyColumnScrollbar
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.ColorLike
 import my.novelreader.coreui.theme.ColorNotice
 import my.novelreader.coreui.theme.colorApp
@@ -328,7 +327,7 @@ internal fun ChaptersScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                containerColor = ColorAccent,
+                containerColor = MaterialTheme.colorApp.accent,
                 onClick = onResumeReading
             ) {
                 Row(

@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import my.novelreader.coreui.components.Section
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.colorApp
 import my.novelreader.personal.charts.AreaChart
 
@@ -58,7 +57,7 @@ fun ReadingActivitySection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                accentColor = ColorAccent,
+                accentColor = MaterialTheme.colorApp.accent,
                 labels = listOf("S", "M", "T", "W", "T", "F", "S")
             )
         }

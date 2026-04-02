@@ -17,4 +17,5 @@ data class Book(
     val description: String = "",
     val lastReadEpochTimeMilli: Long = 0,
     val lastSeenChaptersCount: Int = 0,
+    val coverSeedColor: Int? = null,
 ) : Parcelable

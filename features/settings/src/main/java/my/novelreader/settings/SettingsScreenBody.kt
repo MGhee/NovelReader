@@ -40,6 +40,7 @@ internal fun SettingsScreenBody(
     modifier: Modifier = Modifier,
     onFollowSystem: (Boolean) -> Unit,
     onThemeSelected: (Themes) -> Unit,
+    onBookDynamicThemeChange: (Boolean) -> Unit,
     onCleanDatabase: () -> Unit,
     onCleanImageFolder: () -> Unit,
     onSyncWithServer: () -> Unit = {},
@@ -61,7 +62,9 @@ internal fun SettingsScreenBody(
             currentFollowSystem = state.followsSystemTheme.value,
             currentTheme = state.currentTheme.value,
             onFollowSystemChange = onFollowSystem,
-            onCurrentThemeChange = onThemeSelected
+            onCurrentThemeChange = onThemeSelected,
+            bookDynamicThemeEnabled = state.bookDynamicThemeEnabled.value,
+            onBookDynamicThemeChange = onBookDynamicThemeChange
         )
         HorizontalDivider()
         SettingsData(
@@ -132,6 +135,7 @@ private fun Preview() {
                 state = SettingsScreenState(
                     followsSystemTheme = remember { derivedStateOf { true } },
                     currentTheme = theme,
+                    bookDynamicThemeEnabled = remember { derivedStateOf { false } },
                     databaseSize = remember { mutableStateOf("1 MB") },
                     imageFolderSize = remember { mutableStateOf("10 MB") },
                     isTranslationSettingsVisible = remember { mutableStateOf(true) },
@@ -162,6 +166,7 @@ private fun Preview() {
                 ),
                 onFollowSystem = { },
                 onThemeSelected = { },
+                onBookDynamicThemeChange = { },
                 onCleanDatabase = { },
                 onCleanImageFolder = { },
                 onSyncWithServer = { },

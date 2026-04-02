@@ -47,6 +47,7 @@ androidx-testing-rules = "1.6.1"
 androidx-testing-orchestrator = "1.5.0"
 androidx-testing-junit = "1.2.1"
 androidx-testing-espresso = "3.6.1"
+androidx-palette = "1.0.0"
 
 compose-coil = "2.4.0"
 compose-accompanist = "0.30.1"
@@ -169,6 +170,7 @@ androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref =
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "androidx-credentials" }
 androidx-credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+androidx-palette = { module = "androidx.palette:palette", version.ref = "androidx-palette" }
 
 material = { module = "com.google.android.material:material", version.ref = "androidx-material" }
 

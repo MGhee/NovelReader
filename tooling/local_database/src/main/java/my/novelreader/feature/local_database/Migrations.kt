@@ -56,6 +56,9 @@ internal fun databaseMigrations() = arrayOf(
             )
         """)
     },
+    migration(11) {
+        it.execSQL("ALTER TABLE Book ADD COLUMN coverSeedColor INTEGER DEFAULT NULL")
+    },
 )
 
 internal fun migration(vi: Int, migrate: (SupportSQLiteDatabase) -> Unit) =

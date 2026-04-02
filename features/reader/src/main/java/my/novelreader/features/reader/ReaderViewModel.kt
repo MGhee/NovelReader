@@ -12,6 +12,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import my.novelreader.coreui.BaseViewModel
 import my.novelreader.coreui.mappers.toTheme
+import my.novelreader.coreui.theme.BookColorExtractor
+import my.novelreader.coreui.theme.ThemeProvider
 import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.core.Toasty
 import my.novelreader.core.utils.StateExtra_Boolean
@@ -40,6 +42,8 @@ internal class ReaderViewModel @Inject constructor(
     private val readerManager: ReaderManager,
     readerViewHandlersActions: ReaderViewHandlersActions,
     private val toasty: Toasty,
+    private val bookColorExtractor: BookColorExtractor,
+    private val themeProvider: ThemeProvider,
 ) : BaseViewModel(), ReaderStateBundle {
 
     override var bookUrl by StateExtra_String(stateHandler)
@@ -83,6 +87,13 @@ internal class ReaderViewModel @Inject constructor(
             style = ReaderScreenState.Settings.StyleSettingsData(
                 followSystem = appPreferences.THEME_FOLLOW_SYSTEM.state(viewModelScope),
                 currentTheme = derivedStateOf { themeId.value.toTheme },
+                readerTheme = derivedStateOf {
+                    val readerThemeId = appPreferences.READER_THEME_ID.state(viewModelScope).value
+                    if (appPreferences.BOOK_DYNAMIC_THEME_ENABLED.value)
+                        readerThemeId.toTheme
+                    else themeId.value.toTheme
+                },
+                isDynamicColorActive = appPreferences.BOOK_DYNAMIC_THEME_ENABLED.state(viewModelScope),
                 textFont = appPreferences.READER_FONT_FAMILY.state(viewModelScope),
                 textSize = appPreferences.READER_FONT_SIZE.state(viewModelScope),
                 textIndent = appPreferences.READER_TEXT_INDENT.state(viewModelScope),
@@ -112,6 +123,22 @@ internal class ReaderViewModel @Inject constructor(
                         chapterUrl = newChapterUrl
                     }
                 }
+        }
+
+        // Extract and apply book color if dynamic theme is enabled
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!appPreferences.BOOK_DYNAMIC_THEME_ENABLED.value) return@launch
+            val book = appRepository.libraryBooks.get(bookUrl) ?: return@launch
+            val seedColor = book.coverSeedColor ?: run {
+                // Extract and cache
+                val extracted = bookColorExtractor.extractSeedColor(bookUrl, book.coverImageUrl)
+                    ?: return@launch
+                appRepository.libraryBooks.updateCoverSeedColor(bookUrl, extracted)
+                extracted
+            }
+            withContext(Dispatchers.Main) {
+                themeProvider.setActiveBookSeedColor(seedColor)
+            }
         }
     }
 

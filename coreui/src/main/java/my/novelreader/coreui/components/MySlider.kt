@@ -29,8 +29,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.InternalTheme
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.mix
 import my.novelreader.coreui.theme.selectableMinHeight
 
@@ -51,7 +51,7 @@ fun MySlider(
         Text(
             text = text,
             modifier = Modifier.align(Alignment.Center),
-            color = MaterialTheme.colorScheme.contentColorFor(ColorAccent)
+            color = MaterialTheme.colorScheme.contentColorFor(MaterialTheme.colorApp.accent)
         )
     }
 }
@@ -80,9 +80,13 @@ private fun MySliderBase(
     value: Float,
     onValueChange: (Float) -> Unit,
     height: Dp = selectableMinHeight,
-    backgroundColor: Color = ColorAccent.mix(MaterialTheme.colorScheme.primary, 0.5f),
-    trackColor: Color = ColorAccent,
+    backgroundColor: Color = Color.Unspecified,
+    trackColor: Color = Color.Unspecified,
 ) {
+    val accentColor = MaterialTheme.colorApp.accent
+    val resolvedBackgroundColor = if (backgroundColor == Color.Unspecified)
+        accentColor.mix(MaterialTheme.colorScheme.primary, 0.5f) else backgroundColor
+    val resolvedTrackColor = if (trackColor == Color.Unspecified) accentColor else trackColor
     val currentValue by rememberUpdatedState(newValue = value)
     BoxWithConstraints {
         val currentDensity by rememberUpdatedState(newValue = LocalDensity.current)
@@ -106,7 +110,7 @@ private fun MySliderBase(
                 .fillMaxWidth()
                 .height(height)
                 .clip(CircleShape)
-                .background(backgroundColor)
+                .background(resolvedBackgroundColor)
                 .draggable(
                     orientation = Orientation.Horizontal,
                     state = rememberDraggableState { deltaPx ->
@@ -129,7 +133,7 @@ private fun MySliderBase(
                     .height(height)
                     .width(with(currentDensity) { offsetPx.toDp() })
                     .clip(RoundedCornerShape(bottomEndPercent = 50, topEndPercent = 50))
-                    .background(trackColor)
+                    .background(resolvedTrackColor)
             )
         }
     }

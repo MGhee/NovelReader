@@ -8,4 +8,8 @@ interface ThemeProvider {
     fun followSystem(stateCoroutineScope: CoroutineScope): State<Boolean>
 
     fun currentTheme(stateCoroutineScope: CoroutineScope): State<Themes>
+
+    fun bookSeedColor(stateCoroutineScope: CoroutineScope): State<Int?>
+
+    fun setActiveBookSeedColor(seedColor: Int?)
 }

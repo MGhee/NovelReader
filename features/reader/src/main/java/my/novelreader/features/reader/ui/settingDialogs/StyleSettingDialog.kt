@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -46,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import my.novelreader.core.appPreferences.ReaderLineSpacingLevel
 import my.novelreader.core.appPreferences.ReaderMarginLevel
 import my.novelreader.core.appPreferences.ReaderOrientation
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.Themes
 import my.novelreader.features.reader.tools.FontsLoader
 import my.novelreader.features.reader.ui.ReaderScreenState
@@ -60,6 +61,7 @@ internal fun StyleSettingDialog(
     onTextFontChange: (String) -> Unit,
     onFollowSystemChange: (Boolean) -> Unit,
     onThemeChange: (Themes) -> Unit,
+    onReaderThemeChange: (Themes) -> Unit = {},
     onTextIndentChange: (Boolean) -> Unit,
     onMarginLevelChange: (ReaderMarginLevel) -> Unit,
     onLineSpacingLevelChange: (ReaderLineSpacingLevel) -> Unit,
@@ -103,8 +105,18 @@ internal fun StyleSettingDialog(
                         Text(
                             text = stringResource(id = R.string.background),
                             style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 4.dp)
                         )
+                        if (state.isDynamicColorActive.value) {
+                            Text(
+                                text = "Reading background (app colors follow your book)",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    .alpha(0.7f),
+                                fontSize = MaterialTheme.typography.labelSmall.fontSize * 0.85f
+                            )
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -113,7 +125,8 @@ internal fun StyleSettingDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Themes.entries.forEach { theme ->
-                                val isSelected = theme == state.currentTheme.value
+                                val isSelected = theme == if (state.isDynamicColorActive.value)
+                                    state.readerTheme.value else state.currentTheme.value
                                 val bgColor = when (theme) {
                                     Themes.LIGHT -> Color(0xFFF5F5F5)
                                     Themes.DARK -> Color(0xFF303030)
@@ -132,10 +145,15 @@ internal fun StyleSettingDialog(
                                         .background(bgColor, shape = MaterialTheme.shapes.small)
                                         .border(
                                             width = if (isSelected) 2.dp else 1.dp,
-                                            color = if (isSelected) ColorAccent else Color.Gray,
+                                            color = if (isSelected) MaterialTheme.colorApp.accent else Color.Gray,
                                             shape = MaterialTheme.shapes.small
                                         )
-                                        .clickable { onThemeChange(theme) },
+                                        .clickable {
+                                            if (state.isDynamicColorActive.value)
+                                                onReaderThemeChange(theme)
+                                            else
+                                                onThemeChange(theme)
+                                        },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
@@ -147,7 +165,7 @@ internal fun StyleSettingDialog(
                                         Icon(
                                             Icons.Filled.Check,
                                             contentDescription = null,
-                                            tint = ColorAccent,
+                                            tint = MaterialTheme.colorApp.accent,
                                             modifier = Modifier
                                                 .size(16.dp)
                                                 .align(Alignment.TopEnd)
@@ -312,7 +330,7 @@ internal fun StyleSettingDialog(
                                     checked = state.keepScreenOn.value,
                                     onCheckedChange = onKeepScreenOnChange,
                                     colors = androidx.compose.material3.CheckboxDefaults.colors(
-                                        checkedColor = ColorAccent
+                                        checkedColor = MaterialTheme.colorApp.accent
                                     )
                                 )
                             },
@@ -330,7 +348,7 @@ internal fun StyleSettingDialog(
                                     checked = state.textIndent.value,
                                     onCheckedChange = onTextIndentChange,
                                     colors = androidx.compose.material3.CheckboxDefaults.colors(
-                                        checkedColor = ColorAccent
+                                        checkedColor = MaterialTheme.colorApp.accent
                                     )
                                 )
                             },
@@ -371,7 +389,7 @@ internal fun StyleSettingDialog(
                                     checked = state.followSystem.value,
                                     onCheckedChange = onFollowSystemChange,
                                     colors = SwitchDefaults.colors(
-                                        checkedThumbColor = ColorAccent,
+                                        checkedThumbColor = MaterialTheme.colorApp.accent,
                                     )
                                 )
                             },

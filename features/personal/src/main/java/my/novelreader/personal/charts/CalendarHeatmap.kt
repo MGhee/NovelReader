@@ -22,10 +22,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import my.novelreader.coreui.theme.Success100
-import my.novelreader.coreui.theme.Success300
-import my.novelreader.coreui.theme.Success500
-import my.novelreader.coreui.theme.Success800
+import my.novelreader.coreui.theme.colorApp
 import java.util.Calendar
 
 @Composable
@@ -88,6 +85,11 @@ fun CalendarHeatmap(
         scrollState.scrollTo(scrollState.maxValue)
     }
 
+    val color1 = MaterialTheme.colorApp.calendarHeat1
+    val color2 = MaterialTheme.colorApp.calendarHeat2
+    val color3 = MaterialTheme.colorApp.calendarHeat3
+    val color4 = MaterialTheme.colorApp.calendarHeat4
+
     Box(
         modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
@@ -111,10 +113,6 @@ fun CalendarHeatmap(
                 val maxChapters = (yearData.values.maxOrNull() ?: 1).coerceAtLeast(1)
 
                 val colorEmpty = emptyColor
-                val color1 = Success100
-                val color2 = Success300
-                val color3 = Success500
-                val color4 = Success800
 
                 fun getColor(chapters: Int): androidx.compose.ui.graphics.Color {
                     return when {

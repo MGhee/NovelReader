@@ -24,7 +24,7 @@ open class BaseActivity : AppCompatActivity() {
     @Inject
     lateinit var toasty: Toasty
 
-    private fun getAppTheme(): Int {
+    protected open fun getAppTheme(): Int {
         val theme = appPreferences.THEME_ID.value.toTheme
         if (!appPreferences.THEME_FOLLOW_SYSTEM.value)
             return theme.themeId

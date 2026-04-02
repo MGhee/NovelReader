@@ -15,7 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.textPadding
 import my.novelreader.settings.R
 import my.novelreader.settings.views.SettingsTranslationModelsDialog
@@ -33,7 +33,7 @@ internal fun SettingsTranslationModels(
             text = stringResource(R.string.settings_title_translation_models),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.textPadding(),
-            color = ColorAccent
+            color = MaterialTheme.colorApp.accent
         )
         ListItem(
             headlineContent = {

@@ -24,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import my.novelreader.coreui.components.Section
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.colorApp
 import my.novelreader.personal.charts.ClockChart
 
@@ -112,7 +111,7 @@ private fun HabitStat(
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = ColorAccent,
+            tint = MaterialTheme.colorApp.accent,
             modifier = Modifier.size(18.dp)
         )
         Text(

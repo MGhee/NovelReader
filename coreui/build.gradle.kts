@@ -18,6 +18,7 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.palette)
     implementation(libs.material)
     implementation(libs.androidx.lifecycle.livedata.ktx)
 

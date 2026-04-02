@@ -12,7 +12,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import my.novelreader.coreui.BaseViewModel
+import my.novelreader.coreui.theme.BookColorExtractor
+import my.novelreader.coreui.theme.ThemeProvider
 import my.novelreader.data.AppRepository
 import my.novelreader.data.DownloaderRepository
 import my.novelreader.data.EpubImporterRepository
@@ -47,6 +50,8 @@ internal class ChaptersViewModel @Inject constructor(
     private val chaptersRepository: ChaptersRepository,
     private val epubImporterRepository: EpubImporterRepository,
     private val workersInteractions: WorkersInteractions,
+    private val bookColorExtractor: BookColorExtractor,
+    private val themeProvider: ThemeProvider,
     stateHandle: SavedStateHandle,
 ) : BaseViewModel(), ChapterStateBundle {
 
@@ -104,6 +109,20 @@ internal class ChaptersViewModel @Inject constructor(
             chaptersRepository.getChaptersSortedFlow(bookUrl = bookUrl).collect {
                 state.chapters.clear()
                 state.chapters.addAll(it)
+            }
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!appPreferences.BOOK_DYNAMIC_THEME_ENABLED.value) return@launch
+            val book = appRepository.libraryBooks.get(bookUrl) ?: return@launch
+            val seedColor = book.coverSeedColor ?: run {
+                val extracted = bookColorExtractor.extractSeedColor(bookUrl, book.coverImageUrl)
+                    ?: return@launch
+                appRepository.libraryBooks.updateCoverSeedColor(bookUrl, extracted)
+                extracted
+            }
+            withContext(Dispatchers.Main) {
+                themeProvider.setActiveBookSeedColor(seedColor)
             }
         }
     }

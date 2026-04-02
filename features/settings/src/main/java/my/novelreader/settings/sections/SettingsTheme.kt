@@ -19,8 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.Themes
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.textPadding
 import my.novelreader.settings.R
 
@@ -31,13 +31,15 @@ internal fun SettingsTheme(
     currentFollowSystem: Boolean,
     onFollowSystemChange: (Boolean) -> Unit,
     onCurrentThemeChange: (Themes) -> Unit,
+    bookDynamicThemeEnabled: Boolean,
+    onBookDynamicThemeChange: (Boolean) -> Unit,
 ) {
     Column {
         Text(
             text = stringResource(id = R.string.theme),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.textPadding(),
-            color = ColorAccent
+            color = MaterialTheme.colorApp.accent
         )
         // Follow system theme
         ListItem(
@@ -58,7 +60,36 @@ internal fun SettingsTheme(
                     checked = currentFollowSystem,
                     onCheckedChange = onFollowSystemChange,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = ColorAccent,
+                        checkedThumbColor = MaterialTheme.colorApp.accent,
+                        checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
+                    )
+                )
+            }
+        )
+        // Book dynamic theme
+        ListItem(
+            modifier = Modifier
+                .clickable { onBookDynamicThemeChange(!bookDynamicThemeEnabled) },
+            headlineContent = {
+                Text(text = stringResource(id = R.string.book_cover_theme))
+            },
+            supportingContent = {
+                Text(text = stringResource(id = R.string.book_cover_theme_description))
+            },
+            leadingContent = {
+                Icon(
+                    Icons.Outlined.ColorLens,
+                    null,
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            },
+            trailingContent = {
+                Switch(
+                    checked = bookDynamicThemeEnabled,
+                    onCheckedChange = onBookDynamicThemeChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorApp.accent,
                         checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
                         uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
                     )

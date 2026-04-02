@@ -36,7 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import my.novelreader.coreui.components.AnimatedTransition
 import my.novelreader.coreui.components.ImageViewGlide
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.InternalTheme
 import my.novelreader.coreui.theme.PreviewThemes
 import my.novelreader.data.CatalogItem
@@ -70,7 +70,7 @@ internal fun CatalogList(
             Text(
                 text = stringResource(id = R.string.database),
                 style = MaterialTheme.typography.titleMedium,
-                color = ColorAccent,
+                color = MaterialTheme.colorApp.accent,
             )
         }
 
@@ -113,7 +113,7 @@ internal fun CatalogList(
                 Text(
                     text = stringResource(id = R.string.pinned_sources),
                     style = MaterialTheme.typography.titleMedium,
-                    color = ColorAccent,
+                    color = MaterialTheme.colorApp.accent,
                 )
             }
 
@@ -138,7 +138,7 @@ internal fun CatalogList(
                 Text(
                     text = stringResource(id = R.string.all_sources),
                     style = MaterialTheme.typography.titleMedium,
-                    color = ColorAccent,
+                    color = MaterialTheme.colorApp.accent,
                 )
             }
 

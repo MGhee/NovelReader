@@ -27,7 +27,7 @@ import my.novelreader.coreui.components.BookTitlePosition
 import my.novelreader.coreui.composableActions.ListLoadWatcher
 import my.novelreader.coreui.modifiers.bounceOnPressed
 import my.novelreader.coreui.states.IteratorState
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.InternalTheme
 import my.novelreader.coreui.theme.PreviewThemes
 import my.novelreader.data.CatalogItem
@@ -118,7 +118,7 @@ private fun SourceListView(
             ) {
                 when (loadState) {
                     IteratorState.LOADING -> CircularProgressIndicator(
-                        color = ColorAccent,
+                        color = MaterialTheme.colorApp.accent,
                         modifier = Modifier.padding(36.dp)
                     )
 
@@ -131,12 +131,12 @@ private fun SourceListView(
 
                         list.isEmpty() -> Text(
                             text = stringResource(R.string.no_results_found),
-                            color = ColorAccent,
+                            color = MaterialTheme.colorApp.accent,
                         )
 
                         else -> Text(
                             text = stringResource(R.string.no_more_results),
-                            color = ColorAccent,
+                            color = MaterialTheme.colorApp.accent,
                             modifier = Modifier.topPadding()
                         )
                     }

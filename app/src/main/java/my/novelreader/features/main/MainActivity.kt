@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -33,6 +35,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import my.novelreader.coreui.BaseActivity
 import my.novelreader.coreui.components.AnimatedTransition
 import my.novelreader.coreui.theme.Theme
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.R
 import my.novelreader.catalogexplorer.CatalogExplorerScreen
 import my.novelreader.libraryexplorer.LibraryScreen
@@ -85,7 +88,9 @@ open class MainActivity : BaseActivity() {
                             }
                         }
                     }
-                    NavigationBar {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorApp.navBarSurface
+                    ) {
                         pages.forEachIndexed { pageIndex, page ->
                             NavigationBarItem(
                                 icon = {
@@ -99,6 +104,11 @@ open class MainActivity : BaseActivity() {
                                 onClick = {
                                     activePageIndex = pageIndex
                                 },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorApp.accent,
+                                    selectedTextColor = MaterialTheme.colorApp.accent,
+                                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                                )
                             )
                         }
                     }

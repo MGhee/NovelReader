@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import my.novelreader.coreui.theme.colorApp
+import my.novelreader.coreui.theme.mix
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -37,6 +39,25 @@ fun ClockChart(
     val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val dynamicAccent = MaterialTheme.colorApp.accent
+
+    // Pre-compute blended segment colors outside Canvas
+    val segmentColors = remember(dynamicAccent) {
+        listOf(
+            // 0-5: Night - deep indigo/blue
+            Color(0xFF3949AB).mix(dynamicAccent, 0.3f), Color(0xFF303F9F).mix(dynamicAccent, 0.3f), Color(0xFF283593).mix(dynamicAccent, 0.3f),
+            Color(0xFF1A237E).mix(dynamicAccent, 0.3f), Color(0xFF1A237E).mix(dynamicAccent, 0.3f), Color(0xFF283593).mix(dynamicAccent, 0.3f),
+            // 6-11: Morning - warm amber/orange
+            Color(0xFFFF8F00).mix(dynamicAccent, 0.3f), Color(0xFFFF6F00).mix(dynamicAccent, 0.3f), Color(0xFFFF5722).mix(dynamicAccent, 0.3f),
+            Color(0xFFE64A19).mix(dynamicAccent, 0.3f), Color(0xFFD84315).mix(dynamicAccent, 0.3f), Color(0xFFBF360C).mix(dynamicAccent, 0.3f),
+            // 12-17: Afternoon - teal/green
+            Color(0xFF00897B).mix(dynamicAccent, 0.3f), Color(0xFF00796B).mix(dynamicAccent, 0.3f), Color(0xFF00695C).mix(dynamicAccent, 0.3f),
+            Color(0xFF00838F).mix(dynamicAccent, 0.3f), Color(0xFF0097A7).mix(dynamicAccent, 0.3f), Color(0xFF00ACC1).mix(dynamicAccent, 0.3f),
+            // 18-23: Evening - purple/violet
+            Color(0xFF7B1FA2).mix(dynamicAccent, 0.3f), Color(0xFF8E24AA).mix(dynamicAccent, 0.3f), Color(0xFF9C27B0).mix(dynamicAccent, 0.3f),
+            Color(0xFFAB47BC).mix(dynamicAccent, 0.3f), Color(0xFF7E57C2).mix(dynamicAccent, 0.3f), Color(0xFF5C6BC0).mix(dynamicAccent, 0.3f),
+        )
+    }
 
     LaunchedEffect(hourlyData) {
         animProgress.snapTo(0f)
@@ -78,22 +99,6 @@ fun ClockChart(
 
             // Draw ring segments for each hour
             val segmentAngle = 360f / 24f
-
-            // Time-of-day color palette: deep blue (night) -> warm orange (morning) -> blue (afternoon) -> purple (evening)
-            val segmentColors = listOf(
-                // 0-5: Night - deep indigo/blue
-                Color(0xFF3949AB), Color(0xFF303F9F), Color(0xFF283593),
-                Color(0xFF1A237E), Color(0xFF1A237E), Color(0xFF283593),
-                // 6-11: Morning - warm amber/orange
-                Color(0xFFFF8F00), Color(0xFFFF6F00), Color(0xFFFF5722),
-                Color(0xFFE64A19), Color(0xFFD84315), Color(0xFFBF360C),
-                // 12-17: Afternoon - teal/green
-                Color(0xFF00897B), Color(0xFF00796B), Color(0xFF00695C),
-                Color(0xFF00838F), Color(0xFF0097A7), Color(0xFF00ACC1),
-                // 18-23: Evening - purple/violet
-                Color(0xFF7B1FA2), Color(0xFF8E24AA), Color(0xFF9C27B0),
-                Color(0xFFAB47BC), Color(0xFF7E57C2), Color(0xFF5C6BC0),
-            )
 
             for (hour in 0 until 24) {
                 val intensity = hourlyData[hour]

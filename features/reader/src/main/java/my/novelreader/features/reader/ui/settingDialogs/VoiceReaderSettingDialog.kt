@@ -88,7 +88,6 @@ import kotlinx.coroutines.withContext
 import my.novelreader.coreui.components.MyOutlinedTextField
 import my.novelreader.coreui.components.MySlider
 import my.novelreader.coreui.composableActions.debouncedAction
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.ColorNotice
 import my.novelreader.coreui.theme.InternalTheme
 import my.novelreader.coreui.theme.colorApp
@@ -115,7 +114,7 @@ internal fun VoiceReaderSettingDialog(
             ) {
                 CircularProgressIndicator(
                     strokeWidth = 6.dp,
-                    color = ColorAccent,
+                    color = MaterialTheme.colorApp.accent,
                     modifier = Modifier.background(
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                         CircleShape
@@ -233,7 +232,7 @@ internal fun VoiceReaderSettingDialog(
                             contentDescription = null,
                             modifier = Modifier
                                 .size(32.dp)
-                                .background(ColorAccent, CircleShape),
+                                .background(MaterialTheme.colorApp.accent, CircleShape),
                             tint = Color.White,
                         )
                     }
@@ -248,7 +247,7 @@ internal fun VoiceReaderSettingDialog(
                             tint = Color.White,
                             modifier = Modifier
                                 .size(38.dp)
-                                .background(ColorAccent, CircleShape),
+                                .background(MaterialTheme.colorApp.accent, CircleShape),
                         )
                     }
                     IconButton(onClick = { state.setPlaying(!state.isPlaying.value) }) {
@@ -256,7 +255,7 @@ internal fun VoiceReaderSettingDialog(
                             targetState = state.isPlaying.value,
                             modifier = Modifier
                                 .size(56.dp)
-                                .background(ColorAccent, CircleShape), label = ""
+                                .background(MaterialTheme.colorApp.accent, CircleShape), label = ""
                         ) { target ->
                             when (target) {
                                 true -> Icon(
@@ -283,7 +282,7 @@ internal fun VoiceReaderSettingDialog(
                             tint = Color.White,
                             modifier = Modifier
                                 .size(38.dp)
-                                .background(ColorAccent, CircleShape),
+                                .background(MaterialTheme.colorApp.accent, CircleShape),
                         )
                     }
                     IconButton(
@@ -297,7 +296,7 @@ internal fun VoiceReaderSettingDialog(
                             tint = Color.White,
                             modifier = Modifier
                                 .size(32.dp)
-                                .background(ColorAccent, CircleShape),
+                                .background(MaterialTheme.colorApp.accent, CircleShape),
                         )
                     }
                 }

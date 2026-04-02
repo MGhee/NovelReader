@@ -18,8 +18,10 @@ fun Theme(
     themeProvider: ThemeProvider,
     content: @Composable () -> @Composable Unit,
 ) {
-    val followSystemsTheme by themeProvider.followSystem(rememberCoroutineScope())
-    val selectedTheme by themeProvider.currentTheme(rememberCoroutineScope())
+    val scope = rememberCoroutineScope()
+    val followSystemsTheme by themeProvider.followSystem(scope)
+    val selectedTheme by themeProvider.currentTheme(scope)
+    val bookSeedColor by themeProvider.bookSeedColor(scope)
 
     val isSystemThemeLight = !isSystemInDarkTheme()
     val theme: Themes = when (followSystemsTheme) {
@@ -32,6 +34,7 @@ fun Theme(
     }
     InternalTheme(
         theme = theme,
+        bookSeedColor = bookSeedColor,
         content = content,
     )
 }
@@ -39,22 +42,35 @@ fun Theme(
 @Composable
 fun InternalTheme(
     theme: Themes = if (isSystemInDarkTheme()) Themes.DARK else Themes.LIGHT,
+    bookSeedColor: Int? = null,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when (theme) {
-        Themes.LIGHT -> light_colorScheme
-        Themes.DARK -> dark_colorScheme
-        Themes.BLACK -> black_colorScheme
-        Themes.DARK_TEAL -> darkTeal_colorScheme
-        Themes.SEPIA -> sepia_colorScheme
+    val colorScheme = if (bookSeedColor != null) {
+        remember(bookSeedColor, theme) {
+            generateBookColorScheme(bookSeedColor, theme)
+        }
+    } else {
+        when (theme) {
+            Themes.LIGHT -> light_colorScheme
+            Themes.DARK -> dark_colorScheme
+            Themes.BLACK -> black_colorScheme
+            Themes.DARK_TEAL -> darkTeal_colorScheme
+            Themes.SEPIA -> sepia_colorScheme
+        }
     }
 
-    val appColor = when (theme) {
-        Themes.LIGHT -> light_appColor
-        Themes.DARK -> dark_appColor
-        Themes.BLACK -> black_appColor
-        Themes.DARK_TEAL -> darkTeal_appColor
-        Themes.SEPIA -> sepia_appColor
+    val appColor = if (bookSeedColor != null) {
+        remember(bookSeedColor, theme) {
+            generateBookAppColor(bookSeedColor, theme)
+        }
+    } else {
+        when (theme) {
+            Themes.LIGHT -> light_appColor
+            Themes.DARK -> dark_appColor
+            Themes.BLACK -> black_appColor
+            Themes.DARK_TEAL -> darkTeal_appColor
+            Themes.SEPIA -> sepia_appColor
+        }
     }
 
     val systemUiController = rememberSystemUiController()
@@ -62,10 +78,10 @@ fun InternalTheme(
         color = colorScheme.primary,
         darkIcons = theme.isLight
     )
-    val textSelectionColors = remember {
+    val textSelectionColors = remember(appColor.accent) {
         TextSelectionColors(
-            handleColor = ColorAccent,
-            backgroundColor = ColorAccent.copy(alpha = 0.3f)
+            handleColor = appColor.accent,
+            backgroundColor = appColor.accent.copy(alpha = 0.3f)
         )
     }
 

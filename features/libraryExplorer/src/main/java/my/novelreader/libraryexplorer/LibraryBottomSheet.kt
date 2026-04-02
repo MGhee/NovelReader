@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import my.novelreader.coreui.components.PosNegCheckbox
 import my.novelreader.coreui.components.TernaryStateToggle
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.core.utils.toToggleableState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,7 +38,7 @@ internal fun LibraryBottomSheet(
                 modifier = Modifier
                     .padding(8.dp)
                     .padding(horizontal = 8.dp),
-                color = ColorAccent,
+                color = MaterialTheme.colorApp.accent,
                 style = MaterialTheme.typography.titleMedium
             )
             PosNegCheckbox(
@@ -53,7 +53,7 @@ internal fun LibraryBottomSheet(
                 modifier = Modifier
                     .padding(8.dp)
                     .padding(horizontal = 8.dp),
-                color = ColorAccent,
+                color = MaterialTheme.colorApp.accent,
                 style = MaterialTheme.typography.titleMedium
             )
             TernaryStateToggle(

@@ -44,8 +44,19 @@ class AppPreferences @Inject constructor(
             enumValueOf(it)
         }
     }
+    val READER_THEME_ID = object : Preference<PreferenceThemes>("READER_THEME_ID") {
+        override var value by SharedPreference_Enum(name, preferences, PreferenceThemes.Black) {
+            enumValueOf(it)
+        }
+    }
     val THEME_FOLLOW_SYSTEM = object : Preference<Boolean>("THEME_FOLLOW_SYSTEM") {
         override var value by SharedPreference_Boolean(name, preferences, true)
+    }
+    val BOOK_DYNAMIC_THEME_ENABLED = object : Preference<Boolean>("BOOK_DYNAMIC_THEME_ENABLED") {
+        override var value by SharedPreference_Boolean(name, preferences, false)
+    }
+    val BOOK_DYNAMIC_THEME_SEED_COLOR = object : Preference<Int>("BOOK_DYNAMIC_THEME_SEED_COLOR") {
+        override var value by SharedPreference_Int(name, preferences, 0)
     }
     val READER_FONT_SIZE = object : Preference<Float>("READER_FONT_SIZE") {
         override var value by SharedPreference_Float(name, preferences, 14f)

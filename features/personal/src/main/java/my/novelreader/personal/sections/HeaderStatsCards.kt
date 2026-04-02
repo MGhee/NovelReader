@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.colorApp
 
 @Composable
@@ -140,7 +139,7 @@ private fun StatCard(
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                tint = ColorAccent,
+                tint = MaterialTheme.colorApp.accent,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 0.dp, end = 0.dp)

@@ -58,6 +58,7 @@ internal class SettingsViewModel @Inject constructor(
         imageFolderSize = stateHandle.asMutableStateOf("imageFolderSize") { "" },
         followsSystemTheme = appPreferences.THEME_FOLLOW_SYSTEM.state(viewModelScope),
         currentTheme = derivedStateOf { themeId.toTheme },
+        bookDynamicThemeEnabled = appPreferences.BOOK_DYNAMIC_THEME_ENABLED.state(viewModelScope),
         isTranslationSettingsVisible = mutableStateOf(translationManager.available),
         translationModelsStates = translationManager.models,
         updateAppSetting = SettingsScreenState.UpdateApp(
@@ -146,6 +147,14 @@ internal class SettingsViewModel @Inject constructor(
 
     fun onThemeChange(themes: Themes) {
         appPreferences.THEME_ID.value = themes.toPreferenceTheme
+    }
+
+    fun onBookDynamicThemeChange(enabled: Boolean) {
+        if (!enabled) {
+            // Re-sync reader theme with global theme to avoid mismatch
+            appPreferences.READER_THEME_ID.value = appPreferences.THEME_ID.value
+        }
+        appPreferences.BOOK_DYNAMIC_THEME_ENABLED.value = enabled
     }
 
     fun onGeminiApiKeyChange(apiKey: String) {

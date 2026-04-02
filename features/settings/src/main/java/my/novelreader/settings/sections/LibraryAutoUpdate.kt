@@ -24,7 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.InternalTheme
 import my.novelreader.coreui.theme.textPadding
 import my.novelreader.core.domain.AppVersion
@@ -43,7 +43,7 @@ fun LibraryAutoUpdate(
             text = "Library updates",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.textPadding(),
-            color = ColorAccent
+            color = MaterialTheme.colorApp.accent
         )
         ListItem(
             modifier = Modifier.clickable {
@@ -66,7 +66,7 @@ fun LibraryAutoUpdate(
                         state.autoUpdateEnabled.value = !state.autoUpdateEnabled.value
                     },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = ColorAccent,
+                        checkedThumbColor = MaterialTheme.colorApp.accent,
                         checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
                         uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
                     )
@@ -115,7 +115,7 @@ fun LibraryAutoUpdate(
                         state.autoDownloadNewChapters.value = !state.autoDownloadNewChapters.value
                     },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = ColorAccent,
+                        checkedThumbColor = MaterialTheme.colorApp.accent,
                         checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
                         uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
                     )

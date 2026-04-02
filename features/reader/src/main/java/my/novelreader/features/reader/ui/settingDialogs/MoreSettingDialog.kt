@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import my.novelreader.core.appPreferences.ReaderOrientation
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.reader.R
 
 @Composable
@@ -55,7 +55,7 @@ internal fun MoreSettingDialog(
                     checked = allowTextSelection,
                     onCheckedChange = onAllowTextSelectionChange,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = ColorAccent,
+                        checkedThumbColor = MaterialTheme.colorApp.accent,
                         checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
                         uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
                     )
@@ -81,7 +81,7 @@ internal fun MoreSettingDialog(
                     checked = fullScreen,
                     onCheckedChange = onFullScreen,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = ColorAccent,
+                        checkedThumbColor = MaterialTheme.colorApp.accent,
                         checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
                         uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
                     )
@@ -126,7 +126,7 @@ internal fun MoreSettingDialog(
                         )
                     },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = ColorAccent,
+                        checkedThumbColor = MaterialTheme.colorApp.accent,
                         checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
                         uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
                     )

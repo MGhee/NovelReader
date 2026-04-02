@@ -8,6 +8,18 @@ val ColorAccent = Color(0xFF2A59B6)
 val ColorLike = Color(0xFFF44336)
 val ColorNotice = Color(0xFFE48800)
 
+// Per-theme accent colors
+val AccentLight = Color(0xFF6750A4)     // muted purple, good contrast on white
+val AccentDark = Color(0xFFD0BCFF)      // light lavender, visible on dark grey
+val AccentBlack = Color(0xFFE8DEF8)     // lighter for true black
+val AccentSepia = Color(0xFFA0785A)     // warm brown matching sepia family
+
+// Nav bar surfaces (distinct from background)
+val NavSurfaceLight = Color(0xFFEFEFEF)    // = Grey75, visibly darker than Grey25
+val NavSurfaceDark = Color(0xFF1A1A1A)     // lighter than Grey900
+val NavSurfaceBlack = Color(0xFF141414)    // lift from true black
+val NavSurfaceSepia = Color(0xFFEDD9C3)    // darker than SepiaLight
+
 val Grey0 = Color(0xFFFFFFFF)
 val Grey25 = Color(0xFFFEFEFE)
 val Grey50 = Color(0xFFF8F8F8)

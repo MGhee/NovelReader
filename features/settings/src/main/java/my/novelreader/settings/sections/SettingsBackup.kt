@@ -12,7 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.textPadding
 import my.novelreader.settings.R
 
@@ -26,7 +26,7 @@ internal fun SettingsBackup(
             text = stringResource(id = R.string.backup),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.textPadding(),
-            color = ColorAccent
+            color = MaterialTheme.colorApp.accent
         )
         ListItem(
             headlineContent = {

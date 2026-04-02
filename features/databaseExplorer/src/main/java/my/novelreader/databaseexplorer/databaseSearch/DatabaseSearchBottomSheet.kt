@@ -33,7 +33,6 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import my.novelreader.coreui.components.CollapsibleDivider
 import my.novelreader.coreui.components.next
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.InternalTheme
 import my.novelreader.coreui.theme.PreviewThemes
 import my.novelreader.coreui.theme.colorApp
@@ -75,7 +74,7 @@ internal fun DatabaseSearchBottomSheet(
                     content = {
                         Text(
                             text = stringResource(R.string.clear_filters),
-                            color = ColorAccent
+                            color = MaterialTheme.colorApp.accent
                         )
                     },
                     modifier = Modifier.weight(1f)

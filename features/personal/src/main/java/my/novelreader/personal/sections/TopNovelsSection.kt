@@ -22,7 +22,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import my.novelreader.coreui.components.Section
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.colorApp
 import my.novelreader.personal.TopNovelUiItem
 
@@ -98,7 +97,7 @@ private fun TopNovelItem(
                     .fillMaxWidth(animatedProgress)
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(ColorAccent)
+                    .background(MaterialTheme.colorApp.accent)
             )
         }
     }

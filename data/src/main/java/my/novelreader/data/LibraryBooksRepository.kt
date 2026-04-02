@@ -43,6 +43,9 @@ class LibraryBooksRepository @Inject constructor(
     suspend fun updateCover(bookUrl: String, coverUrl: String) =
         libraryDao.updateCover(bookUrl, coverUrl)
 
+    suspend fun updateCoverSeedColor(bookUrl: String, seedColor: Int) =
+        libraryDao.updateCoverSeedColor(bookUrl, seedColor)
+
     suspend fun updateDescription(bookUrl: String, description: String) =
         libraryDao.updateDescription(bookUrl, description)
 

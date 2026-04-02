@@ -40,6 +40,8 @@ internal data class ReaderScreenState(
         data class StyleSettingsData(
             val followSystem: State<Boolean>,
             val currentTheme: State<Themes>,
+            val readerTheme: State<Themes>,
+            val isDynamicColorActive: State<Boolean>,
             val textFont: State<String>,
             val textSize: State<Float>,
             val textIndent: State<Boolean>,

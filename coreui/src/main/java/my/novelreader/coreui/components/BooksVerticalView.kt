@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -25,7 +26,7 @@ import my.novelreader.coreui.R
 import my.novelreader.coreui.composableActions.ListGridLoadWatcher
 import my.novelreader.coreui.modifiers.bounceOnPressed
 import my.novelreader.coreui.states.IteratorState
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.core.Response
 import my.novelreader.core.appPreferences.ListLayoutMode
 import my.novelreader.core.domain.CloudfareVerificationBypassFailedException
@@ -108,14 +109,14 @@ fun BooksVerticalView(
             ) {
                 when (loadState) {
                     IteratorState.LOADING -> CircularProgressIndicator(
-                        color = ColorAccent
+                        color = MaterialTheme.colorApp.accent
                     )
                     IteratorState.CONSUMED -> Text(
                         text = when {
                             list.isEmpty() -> stringResource(R.string.no_results_found)
                             else -> stringResource(R.string.no_more_results)
                         },
-                        color = ColorAccent
+                        color = MaterialTheme.colorApp.accent
                     )
                     else -> Unit
                 }

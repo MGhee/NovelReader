@@ -50,7 +50,7 @@ import my.novelreader.coreui.components.ExpandableText
 import my.novelreader.coreui.components.ImageView
 import my.novelreader.coreui.components.MyButton
 import my.novelreader.coreui.modifiers.bounceOnPressed
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.clickableNoIndicator
 import my.novelreader.coreui.theme.textPadding
 import my.novelreader.databaseexplorer.R
@@ -281,7 +281,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     ) {
         Text(
             text = title,
-            color = ColorAccent,
+            color = MaterialTheme.colorApp.accent,
             style = MaterialTheme.typography.titleMedium,
         )
         content()

@@ -41,7 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.Success400
 import my.novelreader.feature.local_database.ChapterWithContext
 import my.novelreader.reader.R
@@ -166,7 +166,7 @@ internal fun ReaderChapterListScreen(
                         }
                     },
                     colors = ListItemDefaults.colors(
-                        containerColor = if (isCurrentChapter) ColorAccent else MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = if (isCurrentChapter) MaterialTheme.colorApp.accent else MaterialTheme.colorScheme.surfaceVariant
                     ),
                     modifier = Modifier
                         .fillMaxWidth()

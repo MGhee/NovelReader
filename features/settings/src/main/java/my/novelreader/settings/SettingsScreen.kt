@@ -55,6 +55,7 @@ fun SettingsScreen() {
                 state = viewModel.state,
                 onFollowSystem = viewModel::onFollowSystemChange,
                 onThemeSelected = viewModel::onThemeChange,
+                onBookDynamicThemeChange = viewModel::onBookDynamicThemeChange,
                 onCleanDatabase = viewModel::cleanDatabase,
                 onCleanImageFolder = viewModel::cleanImagesFolder,
                 onSyncWithServer = viewModel::syncWithServer,

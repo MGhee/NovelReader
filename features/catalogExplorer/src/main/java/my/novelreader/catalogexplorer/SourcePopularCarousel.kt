@@ -28,7 +28,7 @@ import my.novelreader.coreui.composableActions.ListLoadWatcher
 import my.novelreader.coreui.modifiers.bounceOnPressed
 import my.novelreader.coreui.states.IteratorState
 import my.novelreader.coreui.states.PagedListIteratorState
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.core.rememberResolvedBookImagePath
 import my.novelreader.core.Response
 import my.novelreader.scraper.domain.BookResult
@@ -89,7 +89,7 @@ internal fun SourcePopularCarousel(
             ) {
                 when (fetchIterator.state) {
                     IteratorState.LOADING -> CircularProgressIndicator(
-                        color = ColorAccent,
+                        color = MaterialTheme.colorApp.accent,
                         modifier = Modifier.padding(36.dp)
                     )
 
@@ -102,12 +102,12 @@ internal fun SourcePopularCarousel(
 
                         fetchIterator.list.isEmpty() -> Text(
                             text = stringResource(R.string.no_results_found),
-                            color = ColorAccent,
+                            color = MaterialTheme.colorApp.accent,
                         )
 
                         else -> Text(
                             text = stringResource(R.string.no_more_results),
-                            color = ColorAccent,
+                            color = MaterialTheme.colorApp.accent,
                             modifier = Modifier.topPadding()
                         )
                     }

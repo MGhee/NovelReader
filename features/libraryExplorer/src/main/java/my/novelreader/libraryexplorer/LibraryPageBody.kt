@@ -91,20 +91,20 @@ internal fun LibraryPageBody(
                                 .padding(bottom = 51.dp, start = 4.dp, end = 4.dp)
                                 .height(24.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(androidx.compose.ui.graphics.Color.Gray.copy(alpha = 0.5f))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         ) {
                             LinearProgressIndicator(
                                 progress = { progressValue },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(24.dp),
-                                color = androidx.compose.ui.graphics.Color.Green.copy(alpha = 0.7f),
+                                color = MaterialTheme.colorApp.accent,
                                 trackColor = androidx.compose.ui.graphics.Color.Transparent
                             )
                             Text(
                                 text = "$percentage%",
                                 fontSize = 14.sp,
-                                color = androidx.compose.ui.graphics.Color.White,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.align(Alignment.Center)
                             )
                         }

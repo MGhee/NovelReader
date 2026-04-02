@@ -36,9 +36,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import my.novelreader.coreui.theme.ColorAccent
 import my.novelreader.coreui.theme.InternalTheme
 import my.novelreader.coreui.theme.Themes
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.coreui.theme.ifCase
 import my.novelreader.coreui.theme.selectableMinHeight
 
@@ -58,7 +58,7 @@ fun MyButton(
     backgroundColor: Color = MaterialTheme.colorScheme.primary,
     textStyle: TextStyle = LocalTextStyle.current,
     selected: Boolean = false,
-    selectedBackgroundColor: Color = ColorAccent,
+    selectedBackgroundColor: Color = Color.Unspecified,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     indication: Indication = LocalIndication.current,
@@ -81,6 +81,9 @@ fun MyButton(
         )
     }
 ) {
+    val resolvedSelectedBg = if (selectedBackgroundColor == Color.Unspecified)
+        MaterialTheme.colorApp.accent else selectedBackgroundColor
+
     InternalButton(
         modifier = modifier,
         enabled = enabled,
@@ -92,7 +95,7 @@ fun MyButton(
         borderWidth = borderWidth,
         borderColor = borderColor,
         backgroundColor = backgroundColor,
-        selectedBackgroundColor = selectedBackgroundColor,
+        selectedBackgroundColor = resolvedSelectedBg,
         selected = selected,
         onClick = onClick,
         onLongClick = onLongClick,

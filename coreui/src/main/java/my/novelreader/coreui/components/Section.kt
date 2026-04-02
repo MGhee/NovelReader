@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 
 @Composable
 fun Section(
@@ -29,7 +29,7 @@ fun Section(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(12.dp),
-                color = ColorAccent,
+                color = MaterialTheme.colorApp.accent,
                 textAlign = TextAlign.Center,
             )
         }

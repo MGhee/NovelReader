@@ -34,6 +34,7 @@ fun AreaChart(
     val animProgress = remember { Animatable(0f) }
     val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
     LaunchedEffect(data) {
         animProgress.snapTo(0f)
@@ -137,7 +138,7 @@ fun AreaChart(
                         center = point
                     )
                     drawCircle(
-                        color = Color.White.copy(alpha = 0.8f * progress),
+                        color = onSurfaceColor.copy(alpha = 0.8f * progress),
                         radius = 2f,
                         center = point
                     )

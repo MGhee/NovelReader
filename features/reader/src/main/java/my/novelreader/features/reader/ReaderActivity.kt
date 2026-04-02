@@ -39,7 +39,9 @@ import kotlinx.coroutines.withContext
 import my.novelreader.coreui.BaseActivity
 import my.novelreader.coreui.composableActions.SetSystemBarTransparent
 import my.novelreader.coreui.mappers.toPreferenceTheme
+import my.novelreader.coreui.mappers.toTheme
 import my.novelreader.coreui.theme.Theme
+import my.novelreader.coreui.theme.Themes
 import my.novelreader.coreui.theme.colorAttrRes
 import my.novelreader.core.utils.Extra_Boolean
 import my.novelreader.core.utils.Extra_String
@@ -174,6 +176,18 @@ class ReaderActivity : BaseActivity() {
     }
 
     private val fontsLoader = FontsLoader(this)
+
+    override fun getAppTheme(): Int {
+        if (!appPreferences.BOOK_DYNAMIC_THEME_ENABLED.value) return super.getAppTheme()
+        val theme = appPreferences.READER_THEME_ID.value.toTheme
+        if (!appPreferences.THEME_FOLLOW_SYSTEM.value) return theme.themeId
+        val isSystemThemeLight = !this.resources.configuration.let {
+            (it.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
+        if (isSystemThemeLight && !theme.isLight) return Themes.LIGHT.themeId
+        if (!isSystemThemeLight && theme.isLight) return Themes.DARK.themeId
+        return theme.themeId
+    }
 
     private fun isHorizontalMode(): Boolean =
         appPreferences.READER_ORIENTATION.value == ReaderOrientation.Horizontal
@@ -366,6 +380,12 @@ class ReaderActivity : BaseActivity() {
                 viewModel.reloadReader()
             }
         }
+
+        // Observe reader theme changes and trigger recreate if book dynamic theme is enabled
+        appPreferences.READER_THEME_ID.flow().drop(1)
+            .filter { appPreferences.BOOK_DYNAMIC_THEME_ENABLED.value }
+            .asLiveData()
+            .observe(this) { recreate() }
 
         // Apply saved reader orientation after initial chapter loads
         lifecycleScope.launch {
@@ -657,6 +677,7 @@ class ReaderActivity : BaseActivity() {
                     onKeepScreenOn = { appPreferences.READER_KEEP_SCREEN_ON.value = it },
                     onFollowSystem = { appPreferences.THEME_FOLLOW_SYSTEM.value = it },
                     onThemeSelected = { appPreferences.THEME_ID.value = it.toPreferenceTheme },
+                    onReaderThemeSelected = { appPreferences.READER_THEME_ID.value = it.toPreferenceTheme },
                     onFullScreen = { appPreferences.READER_FULL_SCREEN.value = it },
                     onOrientationChange = {
                         appPreferences.READER_ORIENTATION.value = it

@@ -32,7 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import my.novelreader.coreui.theme.ColorAccent
+import my.novelreader.coreui.theme.colorApp
 import my.novelreader.personal.sections.HeaderStatsCards
 import my.novelreader.personal.sections.ReadingActivitySection
 import my.novelreader.personal.sections.ReadingCalendarSection
