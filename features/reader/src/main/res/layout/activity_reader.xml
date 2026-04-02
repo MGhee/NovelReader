@@ -5,6 +5,7 @@
 	android:id="@+id/reader"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
+	android:background="?android:attr/colorBackground"
 	>
 
 	<my.novelreader.features.reader.view.ReaderView
