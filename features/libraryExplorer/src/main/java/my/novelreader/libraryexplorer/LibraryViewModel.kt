@@ -2,6 +2,7 @@ package my.novelreader.libraryexplorer
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -9,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import android.util.Log
 import my.novelreader.core.Toasty
 import my.novelreader.coreui.BaseViewModel
 import my.novelreader.data.AppRepository
@@ -72,6 +74,13 @@ internal class LibraryViewModel @Inject constructor(
                 continueReadingChapterPosition = (chapter?.position ?: -1) + 1
             }
         }
+
+        // Observe active downloads from WorkManager (handles app restart)
+        viewModelScope.launch {
+            workersInteractions.observeActiveDownloads().collect { activeProgress ->
+                downloadProgress = activeProgress
+            }
+        }
     }
 
     fun readFilterToggle() {
@@ -128,8 +137,11 @@ internal class LibraryViewModel @Inject constructor(
 
     fun downloadAllBookChapters(bookUrl: String) {
         viewModelScope.launch {
+            Log.d("LibraryViewModel", "downloadAllBookChapters called for $bookUrl")
             val chapters = appRepository.bookChapters.chapters(bookUrl)
             val downloadedCount = appRepository.chapterBody.getDownloadedCount(bookUrl)
+
+            Log.d("LibraryViewModel", "Found $downloadedCount/${chapters.size} chapters already downloaded")
 
             if (downloadedCount == chapters.size && chapters.isNotEmpty()) {
                 toasty.show(R.string.all_chapters_already_downloaded)
@@ -138,27 +150,13 @@ internal class LibraryViewModel @Inject constructor(
 
             toasty.show(R.string.downloading_all_chapters_started)
 
-            var downloaded = 0
-            var failed = 0
-            chapters.forEach { chapter ->
-                appRepository.chapterBody.fetchBody(chapter.url)
-                    .onSuccess { downloaded++ }
-                    .onError { failed++ }
+            Log.d("LibraryViewModel", "Enqueueing WorkManager download for $bookUrl")
+            // Delegate to WorkManager for background download
+            workersInteractions.downloadAllBookChapters(bookUrl)
 
-                // Update progress map
-                downloadProgress = downloadProgress.toMutableMap().apply {
-                    put(bookUrl, Pair(downloaded + failed, chapters.size))
-                }
-            }
-
-            // Clear progress when done
-            downloadProgress = downloadProgress.toMutableMap().apply {
-                remove(bookUrl)
-            }
-
-            if (failed > 0) {
-                toasty.show("Downloaded $downloaded, failed $failed chapters")
-            }
+            Log.d("LibraryViewModel", "Starting progress observation for $bookUrl")
+            // Start observing progress for this book
+            observeDownloadProgress(bookUrl)
         }
     }
 
@@ -200,31 +198,12 @@ internal class LibraryViewModel @Inject constructor(
 
             toasty.show(R.string.delete_downloaded_chapters)
 
-            // Now download all chapters again
-            val chaptersToDownload = appRepository.bookChapters.chapters(bookUrl)
+            // Now download all chapters again using WorkManager
             toasty.show(R.string.downloading_all_chapters_started)
+            workersInteractions.downloadAllBookChapters(bookUrl)
 
-            var downloaded = 0
-            var failed = 0
-            chaptersToDownload.forEach { chapter ->
-                appRepository.chapterBody.fetchBody(chapter.url)
-                    .onSuccess { downloaded++ }
-                    .onError { failed++ }
-
-                // Update progress map
-                downloadProgress = downloadProgress.toMutableMap().apply {
-                    put(bookUrl, Pair(downloaded + failed, chaptersToDownload.size))
-                }
-            }
-
-            // Clear progress when done
-            downloadProgress = downloadProgress.toMutableMap().apply {
-                remove(bookUrl)
-            }
-
-            if (failed > 0) {
-                toasty.show("Downloaded $downloaded, failed $failed chapters")
-            }
+            // Start observing progress for this book
+            observeDownloadProgress(bookUrl)
         }
     }
 
@@ -250,7 +229,17 @@ internal class LibraryViewModel @Inject constructor(
         }
     }
 
-    
+    private fun observeDownloadProgress(bookUrl: String) {
+        viewModelScope.launch {
+            workersInteractions.observeDownloadProgress(bookUrl).collect { progress ->
+                downloadProgress = if (progress != null) {
+                    downloadProgress.toMutableMap().apply { put(bookUrl, progress) }
+                } else {
+                    downloadProgress.toMutableMap().apply { remove(bookUrl) }
+                }
+            }
+        }
+    }
 
     fun updateLastSeenChaptersCount(bookUrl: String, chaptersCount: Int) {
         viewModelScope.launch {

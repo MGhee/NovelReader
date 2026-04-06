@@ -70,12 +70,6 @@ internal class SettingsViewModel @Inject constructor(
             checkingForNewVersion = mutableStateOf(false)
         ),
         libraryAutoUpdate = SettingsScreenState.LibraryAutoUpdate(
-            autoUpdateEnabled = appPreferences.GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_ENABLED.state(
-                viewModelScope
-            ),
-            autoUpdateIntervalHours = appPreferences.GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_INTERVAL_HOURS.state(
-                viewModelScope
-            ),
             autoDownloadNewChapters = appPreferences.GLOBAL_APP_AUTOMATIC_DOWNLOAD_NEW_CHAPTERS.state(
                 viewModelScope
             )

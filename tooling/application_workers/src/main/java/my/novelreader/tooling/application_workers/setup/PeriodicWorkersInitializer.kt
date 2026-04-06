@@ -6,9 +6,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import my.novelreader.core.AppCoroutineScope
 import my.novelreader.core.Response
@@ -48,30 +46,22 @@ class PeriodicWorkersInitializer @Inject constructor(
         )
     }
 
-    private fun startLibraryUpdates(enabled: Boolean, intervalHours: Int) {
-        Timber.d("startLibraryUpdates: called enabled=$enabled intervalHours=$intervalHours")
-        if (!enabled) {
-            if (!workManager.getWorkInfosByTag(LibraryUpdatesWorker.TAG).isCancelled) {
-                workManager.cancelAllWorkByTag(LibraryUpdatesWorker.TAG)
-            }
-            return
+    private fun cancelPeriodicLibraryUpdates() {
+        Timber.d("cancelPeriodicLibraryUpdates: cleaning up old periodic work")
+        if (!workManager.getWorkInfosByTag(LibraryUpdatesWorker.TAG).isCancelled) {
+            workManager.cancelAllWorkByTag(LibraryUpdatesWorker.TAG)
         }
-
-        workManager.enqueueUniquePeriodicWork(
-            LibraryUpdatesWorker.TAG,
-            ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
-            LibraryUpdatesWorker.createPeriodicRequest(
-                updateCategory = LibraryCategory.DEFAULT,
-                repeatIntervalHours = intervalHours
-            ),
-        )
     }
 
-    // Lifecycle observer for foreground sync
+    // Lifecycle observer for foreground events
     override fun onStart(owner: LifecycleOwner) {
-        val serverUrl = appPreferences.SYNC_SERVER_URL.value
-        Timber.d("PeriodicWorkersInitializer.onStart: app came to foreground, serverUrl='$serverUrl'")
+        Timber.d("PeriodicWorkersInitializer.onStart: app came to foreground")
 
+        // Check for library updates on every app open
+        checkLibraryUpdatesOnForeground()
+
+        // Foreground sync
+        val serverUrl = appPreferences.SYNC_SERVER_URL.value
         if (serverUrl.isBlank()) {
             Timber.d("PeriodicWorkersInitializer.onStart: no server URL configured, skipping sync")
             return
@@ -107,6 +97,17 @@ class PeriodicWorkersInitializer @Inject constructor(
         }
     }
 
+    private fun checkLibraryUpdatesOnForeground() {
+        Timber.d("PeriodicWorkersInitializer: checking library updates on foreground")
+        workManager.beginUniqueWork(
+            LibraryUpdatesWorker.TAG_MANUAL,
+            ExistingWorkPolicy.KEEP,
+            LibraryUpdatesWorker.createManualRequest(
+                updateCategory = LibraryCategory.DEFAULT
+            )
+        ).enqueue()
+    }
+
     fun init() {
         appCoroutineScope.launch {
             appPreferences.GLOBAL_APP_UPDATER_CHECKER_ENABLED
@@ -116,14 +117,8 @@ class PeriodicWorkersInitializer @Inject constructor(
                 }
         }
 
-        appCoroutineScope.launch {
-            combine(
-                appPreferences.GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_ENABLED.flow(),
-                appPreferences.GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_INTERVAL_HOURS.flow()
-            ) { enabled, intervalHours ->
-                startLibraryUpdates(enabled, intervalHours)
-            }.collect()
-        }
+        // Cancel any old periodic library update work — updates now happen on app foreground
+        cancelPeriodicLibraryUpdates()
     }
 
     fun startPeriodicSync(serverUrl: String) {

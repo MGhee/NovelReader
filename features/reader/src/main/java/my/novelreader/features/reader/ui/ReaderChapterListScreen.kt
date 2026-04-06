@@ -57,7 +57,14 @@ internal fun ReaderChapterListScreen(
     onBackClick: () -> Unit,
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var debouncedSearchQuery by remember { mutableStateOf("") }
     var sortAscending by remember { mutableStateOf(true) }
+
+    // Debounce search query
+    LaunchedEffect(searchQuery) {
+        delay(300)
+        debouncedSearchQuery = searchQuery
+    }
 
     // Calculate initial scroll position to show current chapter centered
     val initialIndex = remember(chapters, currentChapterUrl) {
@@ -67,11 +74,11 @@ internal fun ReaderChapterListScreen(
     val lazyListState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
 
     // Filter and sort chapters
-    val filteredChapters = remember(chapters, searchQuery, sortAscending) {
+    val filteredChapters = remember(chapters, debouncedSearchQuery, sortAscending) {
         chapters
             .filter { chapter ->
-                chapter.chapter.title.contains(searchQuery, ignoreCase = true) ||
-                        "Chapter ${chapter.chapter.position + 1}".contains(searchQuery, ignoreCase = true)
+                chapter.chapter.title.contains(debouncedSearchQuery, ignoreCase = true) ||
+                        "Chapter ${chapter.chapter.position + 1}".contains(debouncedSearchQuery, ignoreCase = true)
             }
             .sortedBy { if (sortAscending) it.chapter.position else -it.chapter.position }
     }

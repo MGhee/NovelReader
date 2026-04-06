@@ -14,7 +14,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -151,8 +150,6 @@ private fun Preview() {
                         checkingForNewVersion = remember { mutableStateOf(true) },
                     ),
                     libraryAutoUpdate = SettingsScreenState.LibraryAutoUpdate(
-                        autoUpdateEnabled = remember { mutableStateOf(true) },
-                        autoUpdateIntervalHours = remember { mutableIntStateOf(24) },
                         autoDownloadNewChapters = remember { mutableStateOf(false) },
                     ),
                     geminiApiKey = remember { derivedStateOf { "" } },

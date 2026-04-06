@@ -66,7 +66,7 @@ interface AppDatabase {
         ChapterTranslation::class,
         ReadingSession::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 internal abstract class AppRoomDatabase : RoomDatabase(), AppDatabase {

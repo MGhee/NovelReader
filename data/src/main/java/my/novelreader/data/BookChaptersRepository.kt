@@ -56,5 +56,6 @@ class BookChaptersRepository @Inject constructor(
         insertReplace(current.values.toList())
     }
 
+    suspend fun chaptersCount(bookUrl: String) = chapterDao.chaptersCount(bookUrl)
     suspend fun getChaptersWithoutBody(bookUrl: String) = chapterDao.getChaptersWithoutBody(bookUrl)
 }

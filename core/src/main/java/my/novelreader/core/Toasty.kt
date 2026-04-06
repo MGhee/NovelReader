@@ -4,8 +4,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.annotation.StringRes
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,15 +19,17 @@ class ToastyToast @Inject constructor(
     @ApplicationContext private val context: Context
 ) : Toasty {
 
+    private val scope = MainScope()
+
     override fun show(text: String, shortDuration: Boolean) {
-        CoroutineScope(Dispatchers.Main).launch {
+        scope.launch {
             Toast.makeText(context, text, durationMapper(shortDuration))
                 .show()
         }
     }
 
     override fun show(@StringRes id: Int, shortDuration: Boolean) {
-        CoroutineScope(Dispatchers.Main).launch {
+        scope.launch {
             Toast.makeText(context, id, durationMapper(shortDuration))
                 .show()
         }

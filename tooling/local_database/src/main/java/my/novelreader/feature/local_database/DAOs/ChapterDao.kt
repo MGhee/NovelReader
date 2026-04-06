@@ -26,6 +26,9 @@ interface ChapterDao {
     @Update
     suspend fun update(chapter: Chapter)
 
+    @Query("SELECT COUNT(*) FROM Chapter WHERE bookUrl = :bookUrl")
+    suspend fun chaptersCount(bookUrl: String): Int
+
     @Query("SELECT EXISTS(SELECT * FROM Chapter WHERE Chapter.bookUrl = :bookUrl LIMIT 1)")
     suspend fun hasChapters(bookUrl: String): Boolean
 

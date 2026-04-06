@@ -303,16 +303,16 @@ internal class ReaderSession(
         }
         readerTextToSpeech.onClose()
 
-        // End reading session - use runBlocking to ensure it completes before scope cancellation
+        // End reading session - launch with NonCancellable to survive scope cancellation
         if (currentSessionId > 0) {
-            try {
-                runBlocking {
+            scope.launch(kotlinx.coroutines.NonCancellable) {
+                try {
                     android.util.Log.d("ReaderSession", "Ending session: id=$currentSessionId, chaptersRead=$chaptersReadInSession")
                     appRepository.readingStats.endSession(currentSessionId, chaptersReadInSession)
+                    android.util.Log.d("ReaderSession", "Session ended successfully: id=$currentSessionId")
+                } catch (e: Exception) {
+                    android.util.Log.e("ReaderSession", "Failed to end reading session", e)
                 }
-                android.util.Log.d("ReaderSession", "Session ended successfully: id=$currentSessionId")
-            } catch (e: Exception) {
-                android.util.Log.e("ReaderSession", "Failed to end reading session", e)
             }
         } else {
             android.util.Log.w("ReaderSession", "No session to end (currentSessionId=0)")

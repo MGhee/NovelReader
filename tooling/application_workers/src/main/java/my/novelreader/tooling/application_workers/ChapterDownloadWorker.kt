@@ -12,12 +12,21 @@ import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import my.novelreader.data.BookChaptersRepository
 import my.novelreader.data.ChapterBodyRepository
 import my.novelreader.core.Response
+import my.novelreader.feature.local_database.tables.ChapterBody
 import timber.log.Timber
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 @HiltWorker
 internal class ChapterDownloadWorker @AssistedInject constructor(
@@ -30,6 +39,7 @@ internal class ChapterDownloadWorker @AssistedInject constructor(
     companion object {
         const val TAG = "ChapterDownload"
         private const val DATA_BOOK_URL = "bookUrl"
+        private const val BATCH_SIZE = 50
 
         fun createRequest(bookUrl: String): OneTimeWorkRequest {
             val constraints = Constraints.Builder()
@@ -55,42 +65,101 @@ internal class ChapterDownloadWorker @AssistedInject constructor(
 
         return try {
             withContext(Dispatchers.IO) {
+                val totalChapters = bookChaptersRepository.chaptersCount(bookUrl)
                 val chaptersToDownload = bookChaptersRepository.getChaptersWithoutBody(bookUrl)
+                val alreadyDownloaded = totalChapters - chaptersToDownload.size
 
-                Timber.d("ChapterDownloadWorker: found ${chaptersToDownload.size} chapters to download")
+                Timber.d("ChapterDownloadWorker: $alreadyDownloaded already downloaded, ${chaptersToDownload.size} remaining out of $totalChapters total for $bookUrl")
 
-                var downloaded = 0
-                chaptersToDownload.forEach { chapter ->
-                    val result = chapterBodyRepository.downloadChapterBody(chapter.url)
-
-                    if (result is Response.Success) {
-                        downloaded++
-                        Timber.d("ChapterDownloadWorker: downloaded ${chapter.title} ($downloaded/${chaptersToDownload.size})")
-
-                        setProgress(
-                            Data.Builder()
-                                .putInt("chapterNumber", chapter.position)
-                                .putString("chapterTitle", chapter.title)
-                                .putInt("progress", downloaded)
-                                .putInt("total", chaptersToDownload.size)
-                                .build()
-                        )
-                    } else {
-                        Timber.w("ChapterDownloadWorker: failed to download ${chapter.title}")
-                    }
-
-                    // Respect network by adding small delay between requests
-                    if (downloaded < chaptersToDownload.size) {
-                        Thread.sleep(500)
-                    }
+                if (chaptersToDownload.isEmpty()) {
+                    setProgress(
+                        Data.Builder()
+                            .putString("bookUrl", bookUrl)
+                            .putInt("progress", totalChapters)
+                            .putInt("total", totalChapters)
+                            .build()
+                    )
+                    return@withContext Result.success()
                 }
 
-                Timber.d("ChapterDownloadWorker: completed. Downloaded $downloaded/${chaptersToDownload.size} chapters")
+                // Report initial progress (showing already downloaded portion)
+                setProgress(
+                    Data.Builder()
+                        .putString("bookUrl", bookUrl)
+                        .putInt("progress", alreadyDownloaded)
+                        .putInt("total", totalChapters)
+                        .build()
+                )
+
+                val semaphore = Semaphore(60)
+                val downloadedCount = AtomicInteger(0)
+                val failedCount = AtomicInteger(0)
+
+                // Batch insert queue
+                val pendingInserts = ConcurrentLinkedQueue<Pair<ChapterBody, String?>>()
+                val flushingDone = AtomicBoolean(false)
+
+                coroutineScope {
+                    // Background flusher: drains queue to DB in batches
+                    val flusher = launch(Dispatchers.IO) {
+                        while (!flushingDone.get() || pendingInserts.isNotEmpty()) {
+                            val batch = mutableListOf<Pair<ChapterBody, String?>>()
+                            while (batch.size < BATCH_SIZE) {
+                                val item = pendingInserts.poll() ?: break
+                                batch.add(item)
+                            }
+                            if (batch.isNotEmpty()) {
+                                chapterBodyRepository.batchInsertWithTitles(batch)
+                            } else {
+                                delay(50) // Brief wait for more items
+                            }
+                        }
+                    }
+
+                    // Download all chapters concurrently
+                    chaptersToDownload.map { chapter ->
+                        async {
+                            semaphore.withPermit {
+                                downloadChapter(chapter.url, bookUrl)
+                            }
+                        }
+                    }.forEach { task ->
+                        val result = task.await()
+                        if (result != null) {
+                            pendingInserts.add(result)
+                            downloadedCount.incrementAndGet()
+                        } else {
+                            failedCount.incrementAndGet()
+                        }
+
+                        // Report cumulative progress
+                        setProgress(
+                            Data.Builder()
+                                .putString("bookUrl", bookUrl)
+                                .putInt("progress", alreadyDownloaded + downloadedCount.get())
+                                .putInt("total", totalChapters)
+                                .build()
+                        )
+                    }
+
+                    // Signal flusher to finish remaining items
+                    flushingDone.set(true)
+                    flusher.join()
+                }
+
+                Timber.d("ChapterDownloadWorker: completed. Downloaded ${downloadedCount.get()}/${chaptersToDownload.size} chapters for $bookUrl")
                 Result.success()
             }
         } catch (e: Exception) {
-            Timber.e(e, "ChapterDownloadWorker: failed with exception")
+            Timber.e(e, "ChapterDownloadWorker: failed with exception for book $bookUrl")
             Result.retry()
+        }
+    }
+
+    private suspend fun downloadChapter(chapterUrl: String, bookUrl: String): Pair<ChapterBody, String?>? {
+        return when (val result = chapterBodyRepository.downloadChapterContentDirect(chapterUrl, bookUrl)) {
+            is Response.Success -> result.data
+            else -> null
         }
     }
 }

@@ -73,4 +73,49 @@ class ChapterBodyRepository @Inject constructor(
     }
 
     suspend fun getDownloadedCount(bookUrl: String): Int = chapterBodyDao.getDownloadedChapterCount(bookUrl)
+
+    /**
+     * Download chapter content without inserting into DB.
+     * Returns the ChapterBody and optional title for batch insertion later.
+     */
+    suspend fun downloadChapterContent(chapterUrl: String): Response<Pair<ChapterBody, String?>> {
+        if (chapterUrl.isLocalUri) {
+            return Response.Error("Cannot download local chapter content", Exception())
+        }
+
+        return downloaderRepository.bookChapter(chapterUrl)
+            .map { download ->
+                Pair(ChapterBody(url = chapterUrl, body = download.body), download.title)
+            }
+    }
+
+    /**
+     * Download chapter content directly using the book's source, skipping redirect resolution.
+     * Halves HTTP requests for bulk downloads.
+     */
+    suspend fun downloadChapterContentDirect(chapterUrl: String, bookUrl: String): Response<Pair<ChapterBody, String?>> {
+        if (chapterUrl.isLocalUri) {
+            return Response.Error("Cannot download local chapter content", Exception())
+        }
+
+        return downloaderRepository.bookChapterDirect(chapterUrl, bookUrl)
+            .map { download ->
+                Pair(ChapterBody(url = chapterUrl, body = download.body), download.title)
+            }
+    }
+
+    /**
+     * Batch insert chapter bodies and update titles in a single transaction.
+     */
+    suspend fun batchInsertWithTitles(items: List<Pair<ChapterBody, String?>>) {
+        if (items.isEmpty()) return
+        appDatabase.transaction {
+            chapterBodyDao.insertReplace(items.map { it.first })
+            for ((body, title) in items) {
+                if (title != null) {
+                    bookChaptersRepository.updateTitle(body.url, title)
+                }
+            }
+        }
+    }
 }

@@ -6,8 +6,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import my.novelreader.core.AppInternalState
 import my.novelreader.network.interceptors.CloudFareVerificationInterceptor
 import my.novelreader.network.interceptors.DecodeResponseInterceptor
+import my.novelreader.network.interceptors.RetryInterceptor
 import my.novelreader.network.interceptors.UserAgentInterceptor
 import okhttp3.Cache
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -31,7 +33,7 @@ class ScraperNetworkClient @Inject constructor(
 ) : NetworkClient {
 
     private val cacheDir = File(appContext.cacheDir, "network_cache")
-    private val cacheSize = 5L * 1024 * 1024
+    private val cacheSize = 50L * 1024 * 1024
 
     private val cookieJar = ScraperCookieJar()
 
@@ -48,12 +50,15 @@ class ScraperNetworkClient @Inject constructor(
             } else it
         }
         .addInterceptor(UserAgentInterceptor())
+        .addInterceptor(RetryInterceptor())
         .addInterceptor(DecodeResponseInterceptor())
         .addInterceptor(CloudFareVerificationInterceptor(appContext))
         .cookieJar(cookieJar)
         .cache(Cache(cacheDir, cacheSize))
+        .connectionPool(ConnectionPool(60, 5, TimeUnit.MINUTES))
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
     private val clientWithRedirects = client

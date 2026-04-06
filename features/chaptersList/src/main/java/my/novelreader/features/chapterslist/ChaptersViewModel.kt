@@ -96,8 +96,8 @@ internal class ChaptersViewModel @Inject constructor(
         viewModelScope.launch {
             if (state.isLocalSource.value) return@launch
 
-            if (!appRepository.bookChapters.hasChapters(bookUrl))
-                updateChaptersList()
+            // Always fetch latest chapters from the source
+            updateChaptersList()
 
             if (appRepository.libraryBooks.get(bookUrl) != null)
                 return@launch

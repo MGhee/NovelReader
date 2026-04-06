@@ -107,6 +107,26 @@ class DownloaderRepository @Inject constructor(
         }
     }
 
+    /**
+     * Download chapter content directly using the book's source, skipping redirect resolution.
+     * This halves HTTP requests for bulk downloads (1 request instead of 2 per chapter).
+     */
+    suspend fun bookChapterDirect(
+        chapterUrl: String,
+        bookUrl: String,
+    ): Response<my.novelreader.scraper.ChapterDownload> = withContext(Dispatchers.Default) {
+        my.novelreader.network.tryFlatConnect {
+            val source = scraper.getCompatibleSource(bookUrl)
+                ?: return@tryFlatConnect bookChapter(chapterUrl)
+
+            val doc = networkClient.get(source.transformChapterUrl(chapterUrl)).toDocument(source.charset)
+            val body = source.getChapterText(doc)
+                ?: return@tryFlatConnect bookChapter(chapterUrl) // fallback if parsing fails
+            val title = source.getChapterTitle(doc)
+            Response.Success(my.novelreader.scraper.ChapterDownload(body = body, title = title))
+        }
+    }
+
     suspend fun bookChaptersList(
         bookUrl: String,
     ): Response<List<Chapter>> = withContext(Dispatchers.Default) {

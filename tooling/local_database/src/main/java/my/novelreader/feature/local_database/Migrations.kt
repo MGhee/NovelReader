@@ -59,6 +59,9 @@ internal fun databaseMigrations() = arrayOf(
     migration(11) {
         it.execSQL("ALTER TABLE Book ADD COLUMN coverSeedColor INTEGER DEFAULT NULL")
     },
+    migration(12) {
+        it.execSQL("CREATE INDEX IF NOT EXISTS index_Chapter_bookUrl ON Chapter (bookUrl)")
+    },
 )
 
 internal fun migration(vi: Int, migrate: (SupportSQLiteDatabase) -> Unit) =
