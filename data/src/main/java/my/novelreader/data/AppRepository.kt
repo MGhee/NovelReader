@@ -11,6 +11,9 @@ import my.novelreader.core.isContentUri
 import my.novelreader.feature.local_database.AppDatabase
 import my.novelreader.feature.local_database.tables.Book
 import my.novelreader.feature.local_database.tables.Chapter
+import my.novelreader.feature.local_database.tables.ContentType
+import my.novelreader.scraper.MangaSourceInterface
+import my.novelreader.scraper.Scraper
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,7 +26,8 @@ class AppRepository @Inject constructor(
     val chapterBody: ChapterBodyRepository,
     val readingStats: ReadingStatsRepository,
     private val appFileResolver: AppFileResolver,
-    private val epubImporterRepository: EpubImporterRepository
+    private val epubImporterRepository: EpubImporterRepository,
+    private val scraper: Scraper,
 ) {
     val settings = Settings()
     val eventDataRestored = MutableSharedFlow<Unit>()
@@ -37,7 +41,13 @@ class AppRepository @Inject constructor(
                 addToLibrary = true
             ) is Response.Success
         } else {
-            libraryBooks.toggleBookmark(bookUrl = realUrl, bookTitle = bookTitle)
+            // Detect if this is a manga source
+            val contentType = if (scraper.getCompatibleSource(realUrl) is MangaSourceInterface) {
+                ContentType.MANGA
+            } else {
+                ContentType.NOVEL
+            }
+            libraryBooks.toggleBookmark(bookUrl = realUrl, bookTitle = bookTitle, contentType = contentType)
         }
     }
 

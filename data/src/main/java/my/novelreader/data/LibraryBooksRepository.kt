@@ -11,6 +11,7 @@ import my.novelreader.core.fileImporter
 import my.novelreader.feature.local_database.AppDatabase
 import my.novelreader.feature.local_database.DAOs.LibraryDao
 import my.novelreader.feature.local_database.tables.Book
+import my.novelreader.feature.local_database.tables.ContentType
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -49,6 +50,9 @@ class LibraryBooksRepository @Inject constructor(
     suspend fun updateDescription(bookUrl: String, description: String) =
         libraryDao.updateDescription(bookUrl, description)
 
+    suspend fun updateContentType(bookUrl: String, contentType: ContentType) =
+        libraryDao.updateContentType(bookUrl, contentType)
+
     suspend fun get(url: String) = libraryDao.get(url)
 
     suspend fun updateLastSeenChaptersCount(bookUrl: String, count: Int) =
@@ -65,11 +69,12 @@ class LibraryBooksRepository @Inject constructor(
     suspend fun existInLibrary(url: String) = libraryDao.existInLibrary(url)
     suspend fun toggleBookmark(
         bookUrl: String,
-        bookTitle: String
+        bookTitle: String,
+        contentType: ContentType = ContentType.NOVEL
     ): Boolean = appDatabase.transaction {
         when (val book = get(bookUrl)) {
             null -> {
-                insert(Book(title = bookTitle, url = bookUrl, inLibrary = true))
+                insert(Book(title = bookTitle, url = bookUrl, inLibrary = true, contentType = contentType))
                 true
             }
             else -> {
@@ -93,5 +98,40 @@ class LibraryBooksRepository @Inject constructor(
             delay(timeMillis = 1_000)
             updateCover(bookUrl = bookUrl, coverUrl = appFileResolver.getLocalBookCoverPath())
         }
+    }
+
+    /**
+     * Get library books with dynamic filtering and sorting
+     */
+    suspend fun getLibraryBooks(
+        filters: LibraryFilters,
+        sort: LibrarySort,
+        direction: SortDirection,
+        limit: Int = 50,
+        offset: Int = 0
+    ): List<Book> {
+        val query = LibraryQueryBuilder.buildLibraryQuery(filters, sort, direction, limit, offset)
+        return libraryDao.getLibraryBooks(query)
+    }
+
+    /**
+     * Flow version of dynamic library books query
+     */
+    fun getLibraryBooksFlow(
+        filters: LibraryFilters,
+        sort: LibrarySort,
+        direction: SortDirection,
+        limit: Int = 50,
+        offset: Int = 0
+    ) = libraryDao.getLibraryBooksFlow(
+        LibraryQueryBuilder.buildLibraryQuery(filters, sort, direction, limit, offset)
+    )
+
+    /**
+     * Get count of library books matching filters
+     */
+    suspend fun getLibraryBookCount(filters: LibraryFilters): Int {
+        val query = LibraryQueryBuilder.buildLibraryCountQuery(filters)
+        return libraryDao.getLibraryBookCount(query)
     }
 }

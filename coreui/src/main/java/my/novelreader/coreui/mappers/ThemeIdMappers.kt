@@ -10,6 +10,10 @@ val PreferenceThemes.toTheme
         PreferenceThemes.Black -> Themes.BLACK
         PreferenceThemes.DarkTeal -> Themes.DARK_TEAL
         PreferenceThemes.Sepia -> Themes.SEPIA
+        PreferenceThemes.Ocean -> Themes.OCEAN
+        PreferenceThemes.Forest -> Themes.FOREST
+        PreferenceThemes.Sunset -> Themes.SUNSET
+        PreferenceThemes.Purple -> Themes.PURPLE
     }
 
 val Themes.toPreferenceTheme
@@ -19,4 +23,8 @@ val Themes.toPreferenceTheme
         Themes.BLACK -> PreferenceThemes.Black
         Themes.DARK_TEAL -> PreferenceThemes.DarkTeal
         Themes.SEPIA -> PreferenceThemes.Sepia
+        Themes.OCEAN -> PreferenceThemes.Ocean
+        Themes.FOREST -> PreferenceThemes.Forest
+        Themes.SUNSET -> PreferenceThemes.Sunset
+        Themes.PURPLE -> PreferenceThemes.Purple
     }

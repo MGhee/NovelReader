@@ -17,6 +17,7 @@ import my.novelreader.coreui.states.text
 import my.novelreader.coreui.states.title
 import my.novelreader.feature.local_database.tables.Book
 import my.novelreader.feature.local_database.tables.Chapter
+import my.novelreader.feature.local_database.tables.ContentType
 import my.novelreader.navigation.NavigationRoutes
 import my.novelreader.tooling.application_workers.R
 import my.novelreader.feature.local_database.BookMetadata
@@ -96,13 +97,23 @@ internal class LibraryUpdateNotification @Inject constructor(
                 )
             )
             newChapters.firstOrNull()?.let { chapter ->
-                it.add(
+                val readerIntent = if (book.contentType == ContentType.MANGA) {
+                    navigationRoutes.mangaReader(
+                        context = context,
+                        bookUrl = book.url,
+                        chapterUrl = chapter.url,
+                    )
+                } else {
                     navigationRoutes.reader(
                         context = context,
                         bookUrl = book.url,
                         chapterUrl = chapter.url,
                         scrollToSpeakingItem = false
                     )
+                }
+
+                it.add(
+                    readerIntent
                 )
             }
         }

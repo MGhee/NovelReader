@@ -263,6 +263,91 @@ class AppPreferences @Inject constructor(
             override var value by SharedPreference_String(name, preferences, "982186971214-01mnife8l7tauss1seu1olv3vap99pab.apps.googleusercontent.com")
         }
 
+    val LIBRARY_DISPLAY_MODE = object : Preference<String>("LIBRARY_DISPLAY_MODE") {
+        override var value by SharedPreference_String(name, preferences, "ComfortableGrid")
+    }
+
+    val LIBRARY_SEARCH_QUERY = object : Preference<String>("LIBRARY_SEARCH_QUERY") {
+        override var value by SharedPreference_String(name, preferences, "")
+    }
+
+    val LIBRARY_SORT_TYPE = object : Preference<String>("LIBRARY_SORT_TYPE") {
+        override var value by SharedPreference_String(name, preferences, "LastRead")
+    }
+
+    val LIBRARY_SORT_DIRECTION = object : Preference<String>("LIBRARY_SORT_DIRECTION") {
+        override var value by SharedPreference_String(name, preferences, "Descending")
+    }
+
+    val LIBRARY_CATEGORY_ID = object : Preference<String>("LIBRARY_CATEGORY_ID") {
+        override var value by SharedPreference_String(name, preferences, "")
+    }
+
+    val AMOLED_MODE_ENABLED = object : Preference<Boolean>("AMOLED_MODE_ENABLED") {
+        override var value by SharedPreference_Boolean(name, preferences, false)
+    }
+
+    // Manga reader preferences
+    val MANGA_READING_MODE = object : Preference<String>("MANGA_READING_MODE") {
+        override var value by SharedPreference_String(name, preferences, "Webtoon")
+    }
+
+    // Per-source reading mode overrides (stored as JSON: {"sourceId": "ReadingMode", ...})
+    val MANGA_SOURCE_READING_MODES = object : Preference<String>("MANGA_SOURCE_READING_MODES") {
+        override var value by SharedPreference_String(name, preferences, "{}")
+    }
+    val MANGA_ORIENTATION = object : Preference<String>("MANGA_ORIENTATION") {
+        override var value by SharedPreference_String(name, preferences, "Free")
+    }
+    val MANGA_TAP_ZONE_STYLE = object : Preference<String>("MANGA_TAP_ZONE_STYLE") {
+        override var value by SharedPreference_String(name, preferences, "RightAndLeft")
+    }
+    val MANGA_TAPPING_INVERT_MODE = object : Preference<String>("MANGA_TAPPING_INVERT_MODE") {
+        override var value by SharedPreference_String(name, preferences, "No")
+    }
+    val MANGA_BACKGROUND_COLOR = object : Preference<String>("MANGA_BACKGROUND_COLOR") {
+        override var value by SharedPreference_String(name, preferences, "Black")
+    }
+    val MANGA_BRIGHTNESS = object : Preference<Float>("MANGA_BRIGHTNESS") {
+        override var value by SharedPreference_Float(name, preferences, 1f)
+    }
+    val MANGA_COLOR_FILTER = object : Preference<String>("MANGA_COLOR_FILTER") {
+        override var value by SharedPreference_String(name, preferences, "None")
+    }
+    val MANGA_COLOR_FILTER_ALPHA = object : Preference<Float>("MANGA_COLOR_FILTER_ALPHA") {
+        override var value by SharedPreference_Float(name, preferences, 0.15f)
+    }
+    val MANGA_COLOR_FILTER_VALUE = object : Preference<Int>("MANGA_COLOR_FILTER_VALUE") {
+        override var value by SharedPreference_Int(name, preferences, 0xFFFFFFFF.toInt())
+    }
+    val MANGA_CROP_BORDERS = object : Preference<Boolean>("MANGA_CROP_BORDERS") {
+        override var value by SharedPreference_Boolean(name, preferences, false)
+    }
+    val MANGA_SHOW_TRANSITION_CARD = object : Preference<Boolean>("MANGA_SHOW_TRANSITION_CARD") {
+        override var value by SharedPreference_Boolean(name, preferences, true)
+    }
+    val MANGA_KEEP_SCREEN_ON = object : Preference<Boolean>("MANGA_KEEP_SCREEN_ON") {
+        override var value by SharedPreference_Boolean(name, preferences, false)
+    }
+    val MANGA_FULL_SCREEN = object : Preference<Boolean>("MANGA_FULL_SCREEN") {
+        override var value by SharedPreference_Boolean(name, preferences, true)
+    }
+    val MANGA_SHOW_PAGE_INDICATOR = object : Preference<Boolean>("MANGA_SHOW_PAGE_INDICATOR") {
+        override var value by SharedPreference_Boolean(name, preferences, true)
+    }
+    val MANGA_DOUBLE_TAP_ZOOM = object : Preference<Boolean>("MANGA_DOUBLE_TAP_ZOOM") {
+        override var value by SharedPreference_Boolean(name, preferences, true)
+    }
+    val MANGA_PAGE_TRANSITION_ANIMATION = object : Preference<Boolean>("MANGA_PAGE_TRANSITION_ANIMATION") {
+        override var value by SharedPreference_Boolean(name, preferences, true)
+    }
+    val MANGA_DUAL_PAGE_SPREADS = object : Preference<Boolean>("MANGA_DUAL_PAGE_SPREADS") {
+        override var value by SharedPreference_Boolean(name, preferences, false)
+    }
+    val MANGA_SHOW_NAV_OVERLAY_FIRST_LAUNCH = object : Preference<Boolean>("MANGA_SHOW_NAV_OVERLAY_FIRST_LAUNCH") {
+        override var value by SharedPreference_Boolean(name, preferences, true)
+    }
+
     abstract inner class Preference<T>(val name: String) {
         abstract var value: T
         fun flow() = toFlow(name) { value }.flowOn(Dispatchers.IO)

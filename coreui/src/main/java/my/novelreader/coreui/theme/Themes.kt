@@ -33,5 +33,25 @@ enum class Themes(
         isLight = true,
         nameId = R.string.theme_name_sepia,
         themeId = R.style.AppTheme_Sepia,
+    ),
+    OCEAN(
+        isLight = false,
+        nameId = R.string.theme_name_ocean,
+        themeId = R.style.AppTheme_BaseDark_Dark,
+    ),
+    FOREST(
+        isLight = false,
+        nameId = R.string.theme_name_forest,
+        themeId = R.style.AppTheme_BaseDark_Dark,
+    ),
+    SUNSET(
+        isLight = false,
+        nameId = R.string.theme_name_sunset,
+        themeId = R.style.AppTheme_BaseDark_Dark,
+    ),
+    PURPLE(
+        isLight = false,
+        nameId = R.string.theme_name_purple,
+        themeId = R.style.AppTheme_BaseDark_Dark,
     );
 }

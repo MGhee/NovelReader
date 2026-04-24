@@ -5,10 +5,13 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Update
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import my.novelreader.feature.local_database.BookWithContext
 import my.novelreader.feature.local_database.tables.Book
+import my.novelreader.feature.local_database.tables.ContentType
 
 @Dao
 interface LibraryDao {
@@ -51,6 +54,9 @@ interface LibraryDao {
     @Query("UPDATE Book SET description = :description WHERE url == :bookUrl")
     suspend fun updateDescription(bookUrl: String, description: String)
 
+    @Query("UPDATE Book SET contentType = :contentType WHERE url == :bookUrl")
+    suspend fun updateContentType(bookUrl: String, contentType: ContentType)
+
     @Query("UPDATE Book SET lastReadChapter = :chapterUrl WHERE url == :bookUrl")
     suspend fun updateLastReadChapter(bookUrl: String, chapterUrl: String)
 
@@ -85,5 +91,24 @@ interface LibraryDao {
 
     @Query("DELETE FROM Book WHERE inLibrary == 0")
     suspend fun removeAllNonLibraryRows()
+
+    /**
+     * Dynamic query for library books with filters and sorting.
+     * Uses @RawQuery to support dynamic WHERE and ORDER BY clauses.
+     */
+    @RawQuery(observedEntities = [Book::class])
+    suspend fun getLibraryBooks(query: SupportSQLiteQuery): List<Book>
+
+    /**
+     * Flow version of dynamic library query
+     */
+    @RawQuery(observedEntities = [Book::class])
+    fun getLibraryBooksFlow(query: SupportSQLiteQuery): Flow<List<Book>>
+
+    /**
+     * Get count of books matching the dynamic query
+     */
+    @RawQuery
+    suspend fun getLibraryBookCount(query: SupportSQLiteQuery): Int
 
 }

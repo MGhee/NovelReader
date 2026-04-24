@@ -15,6 +15,7 @@ import my.novelreader.epub_tooling.EpubBook
 import my.novelreader.feature.local_database.tables.Book
 import my.novelreader.feature.local_database.tables.Chapter
 import my.novelreader.feature.local_database.tables.ChapterBody
+import my.novelreader.feature.local_database.tables.ContentType
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -68,7 +69,8 @@ class EpubImporterRepository @Inject constructor(
             title = storageFolderName,
             url = localBookUrl,
             coverImageUrl = appFileResolver.getLocalBookCoverPath(),
-            inLibrary = addToLibrary
+            inLibrary = addToLibrary,
+            contentType = ContentType.NOVEL
         ).let { libraryBooks.insert(it) }
 
         epub.chapters.mapIndexed { i, chapter ->

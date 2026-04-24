@@ -7,11 +7,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -28,6 +33,8 @@ import my.novelreader.coreui.components.CollapsibleDivider
 import my.novelreader.coreui.components.TopAppBarSearch
 import my.novelreader.coreui.components.ToolbarMode
 import my.novelreader.navigation.NavigationRouteViewModel
+import my.novelreader.scraper.MangaSourceInterface
+import my.novelreader.strings.R as StringsR
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -39,11 +46,26 @@ fun CatalogExplorerScreen(
     val context by rememberUpdatedState(newValue = LocalContext.current)
     var languagesOptionsExpanded by rememberSaveable { mutableStateOf(false) }
     var toolbarMode by rememberSaveable { mutableStateOf(ToolbarMode.MAIN) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val focusRequester = FocusRequester()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         snapAnimationSpec = null,
         flingAnimationSpec = null
     )
+
+    val tabTitles = listOf(
+        stringResource(StringsR.string.finder_tab_novels),
+        stringResource(StringsR.string.finder_tab_manga),
+    )
+
+    // Filter sources by tab selection
+    val filteredSources = viewModel.sourcesList.filter { item ->
+        when (selectedTab) {
+            0 -> item.catalog !is MangaSourceInterface
+            1 -> item.catalog is MangaSourceInterface
+            else -> true
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -111,6 +133,35 @@ fun CatalogExplorerScreen(
                     }
                 }
                 CollapsibleDivider(scrollBehavior.state)
+                if (toolbarMode == ToolbarMode.MAIN) {
+                    TabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        indicator = { tabPositions ->
+                            if (selectedTab < tabPositions.size) {
+                                androidx.compose.material3.TabRowDefaults.SecondaryIndicator(
+                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                        }
+                    ) {
+                        tabTitles.forEachIndexed { index, title ->
+                            Tab(
+                                selected = selectedTab == index,
+                                onClick = { selectedTab = index },
+                                text = {
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
+                                },
+                                selectedContentColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedContentColor = MaterialTheme.colorScheme.outline,
+                            )
+                        }
+                    }
+                }
             }
         },
         content = { innerPadding ->
@@ -125,8 +176,8 @@ fun CatalogExplorerScreen(
             } else {
                 CatalogList(
                     innerPadding = innerPadding,
-                    databasesList = viewModel.databaseList,
-                    sourcesList = viewModel.sourcesList,
+                    databasesList = if (selectedTab == 0) viewModel.databaseList else emptyList(),
+                    sourcesList = filteredSources,
                     onDatabaseClick = {
                         navigationRouteViewModel.databaseSearch(
                             context,

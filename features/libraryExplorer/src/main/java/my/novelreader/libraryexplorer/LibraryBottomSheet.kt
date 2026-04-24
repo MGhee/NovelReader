@@ -33,38 +33,8 @@ internal fun LibraryBottomSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(top = 16.dp, bottom = 64.dp)) {
-            Text(
-                text = stringResource(id = R.string.filter),
-                modifier = Modifier
-                    .padding(8.dp)
-                    .padding(horizontal = 8.dp),
-                color = MaterialTheme.colorApp.accent,
-                style = MaterialTheme.typography.titleMedium
-            )
-            PosNegCheckbox(
-                text = stringResource(id = R.string.read),
-                state = model.readFilter.toToggleableState(),
-                onStateChange = { model.readFilterToggle() },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Text(
-                text = stringResource(id = R.string.sort),
-                modifier = Modifier
-                    .padding(8.dp)
-                    .padding(horizontal = 8.dp),
-                color = MaterialTheme.colorApp.accent,
-                style = MaterialTheme.typography.titleMedium
-            )
-            TernaryStateToggle(
-                text = stringResource(id = R.string.last_read),
-                state = model.readSort,
-                onStateChange = { model.readSortToggle() },
-                modifier = Modifier.fillMaxWidth(),
-                activeIcon = { Icon(imageVector = Icons.Filled.ArrowUpward, null) },
-                inverseIcon = { Icon(imageVector = Icons.Filled.ArrowDownward, null) },
-                inactiveIcon = { Icon(imageVector = Icons.Filled.SwapVert, null) },
-            )
+            // Filter and sort controls removed in Phase 8 refactoring
+            // Sorting is now handled through LibraryViewModel.setSort()
         }
     }
 }

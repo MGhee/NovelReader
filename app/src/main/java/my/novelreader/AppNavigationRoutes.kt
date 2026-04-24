@@ -7,6 +7,7 @@ import my.novelreader.databaseexplorer.databaseSearch.DatabaseSearchExtras
 import my.novelreader.features.chapterslist.ChaptersActivity
 import my.novelreader.features.main.MainActivity
 import my.novelreader.features.reader.ReaderActivity
+import my.novelreader.features.mangareader.MangaReaderActivity
 import my.novelreader.globalsourcesearch.GlobalSourceSearchActivity
 import my.novelreader.navigation.NavigationRoutes
 import my.novelreader.sourceexplorer.SourceCatalogActivity
@@ -34,6 +35,18 @@ class AppNavigationRoutes @Inject constructor() : NavigationRoutes {
             bookUrl = bookUrl,
             chapterUrl = chapterUrl,
             scrollToSpeakingItem = scrollToSpeakingItem
+        )
+    }
+
+    override fun mangaReader(
+        context: Context,
+        bookUrl: String,
+        chapterUrl: String,
+    ): Intent {
+        return MangaReaderActivity.IntentData(
+            context,
+            bookUrl = bookUrl,
+            chapterUrl = chapterUrl,
         )
     }
 

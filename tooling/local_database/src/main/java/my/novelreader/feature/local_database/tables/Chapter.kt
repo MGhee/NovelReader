@@ -12,5 +12,7 @@ data class Chapter(
     val position: Int,
     val read: Boolean = false,
     val lastReadPosition: Int = 0,
-    val lastReadOffset: Int = 0
+    val lastReadOffset: Int = 0,
+    val bookmarked: Boolean = false,
+    val lastReadMangaPage: Int = 0,
 )

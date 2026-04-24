@@ -39,6 +39,7 @@ include(":tooling:backup_create")
 include(":tooling:epub_importer")
 
 include(":features:reader")
+include(":features:mangaReader")
 include(":features:chaptersList")
 include(":features:globalSourceSearch")
 include(":features:personal")

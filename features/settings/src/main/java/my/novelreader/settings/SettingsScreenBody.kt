@@ -40,6 +40,7 @@ internal fun SettingsScreenBody(
     onFollowSystem: (Boolean) -> Unit,
     onThemeSelected: (Themes) -> Unit,
     onBookDynamicThemeChange: (Boolean) -> Unit,
+    onAmoledModeChange: (Boolean) -> Unit = {},
     onCleanDatabase: () -> Unit,
     onCleanImageFolder: () -> Unit,
     onSyncWithServer: () -> Unit = {},
@@ -63,7 +64,9 @@ internal fun SettingsScreenBody(
             onFollowSystemChange = onFollowSystem,
             onCurrentThemeChange = onThemeSelected,
             bookDynamicThemeEnabled = state.bookDynamicThemeEnabled.value,
-            onBookDynamicThemeChange = onBookDynamicThemeChange
+            onBookDynamicThemeChange = onBookDynamicThemeChange,
+            amoledMode = state.amoledMode.value,
+            onAmoledModeChange = onAmoledModeChange
         )
         HorizontalDivider()
         SettingsData(

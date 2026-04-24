@@ -2,6 +2,7 @@ package my.novelreader
 
 import android.app.Application
 import android.util.Log
+import androidx.hilt.work.HiltWorkerFactory
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
 import coil.ImageLoader
@@ -46,13 +47,13 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
 
     // WorkManager
     override val workManagerConfiguration: Configuration by lazy {
-        val appWorkerFactory = EntryPoints
+        val hiltWorkerFactory = EntryPoints
             .get(this, HiltAppEntryPoint::class.java)
-            .workerFactory()
+            .hiltWorkerFactory()
 
         Configuration.Builder()
             .setMinimumLoggingLevel(if (BuildConfig.DEBUG) Log.DEBUG else Log.INFO)
-            .setWorkerFactory(appWorkerFactory)
+            .setWorkerFactory(hiltWorkerFactory)
             .build()
     }
 }

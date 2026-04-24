@@ -33,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import my.novelreader.feature.local_database.tables.ContentType
 import my.novelreader.coreui.theme.ColorNotice
 import my.novelreader.navigation.NavigationRouteViewModel
 
@@ -110,11 +111,21 @@ fun LibraryScreen(
                         val chapterUrl = libraryModel.getBookOpenChapterUrl(book.book.url)
                             ?: return@launch
 
-                        navigationRouteViewModel.reader(
-                            context = context,
-                            bookUrl = book.book.url,
-                            chapterUrl = chapterUrl
-                        ).let(context::startActivity)
+                        val intent = if (book.book.contentType == ContentType.MANGA) {
+                            navigationRouteViewModel.mangaReader(
+                                context = context,
+                                bookUrl = book.book.url,
+                                chapterUrl = chapterUrl
+                            )
+                        } else {
+                            navigationRouteViewModel.reader(
+                                context = context,
+                                bookUrl = book.book.url,
+                                chapterUrl = chapterUrl
+                            )
+                        }
+
+                        intent.let(context::startActivity)
                     }
                 },
                 onBookMenuClick = {

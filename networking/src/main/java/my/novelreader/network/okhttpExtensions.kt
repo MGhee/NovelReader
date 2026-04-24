@@ -47,3 +47,5 @@ fun Response.toDocument(charset: String): Document {
 fun Response.toJson(): JsonElement {
     return JsonParser.parseString(body.string())
 }
+
+fun Response.bodyString(): String = body.string()

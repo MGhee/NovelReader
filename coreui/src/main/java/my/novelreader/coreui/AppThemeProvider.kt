@@ -2,7 +2,6 @@ package my.novelreader.coreui
 
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.CoroutineScope
 import my.novelreader.coreui.mappers.toTheme
 import my.novelreader.coreui.theme.ThemeProvider
@@ -33,5 +32,9 @@ internal class AppThemeProvider @Inject constructor(
 
     override fun setActiveBookSeedColor(seedColor: Int?) {
         appPreferences.BOOK_DYNAMIC_THEME_SEED_COLOR.value = seedColor ?: 0
+    }
+
+    override fun amoledMode(stateCoroutineScope: CoroutineScope): State<Boolean> {
+        return appPreferences.AMOLED_MODE_ENABLED.state(stateCoroutineScope)
     }
 }

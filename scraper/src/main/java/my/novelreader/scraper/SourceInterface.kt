@@ -18,6 +18,7 @@ sealed interface SourceInterface {
     val isLocalSource: Boolean get() = true
     val requiresLogin: Boolean get() = false
     val charset: String get() = "UTF-8"
+    val isNsfw: Boolean get() = false
 
     // Transform current url to preferred url
     suspend fun transformChapterUrl(url: String): String = url
@@ -42,6 +43,16 @@ sealed interface SourceInterface {
         suspend fun getChapterList(bookUrl: String): Response<List<ChapterResult>>
         suspend fun getCatalogList(index: Int): Response<PagedList<BookResult>>
         suspend fun getCatalogSearch(index: Int, input: String): Response<PagedList<BookResult>>
+
+        /**
+         * Get latest updates. Return null if not supported by the source.
+         */
+        suspend fun latest(page: Int): Response<PagedList<BookResult>>? = null
+
+        /**
+         * Get popular books. Return null if not supported by the source.
+         */
+        suspend fun popular(page: Int): Response<PagedList<BookResult>>? = null
     }
 
     interface Configurable {

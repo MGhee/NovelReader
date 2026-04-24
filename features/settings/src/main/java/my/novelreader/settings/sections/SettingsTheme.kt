@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ColorLens
+import androidx.compose.material.icons.outlined.Contrast
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -33,6 +34,8 @@ internal fun SettingsTheme(
     onCurrentThemeChange: (Themes) -> Unit,
     bookDynamicThemeEnabled: Boolean,
     onBookDynamicThemeChange: (Boolean) -> Unit,
+    amoledMode: Boolean = false,
+    onAmoledModeChange: (Boolean) -> Unit = {},
 ) {
     Column {
         Text(
@@ -112,6 +115,35 @@ internal fun SettingsTheme(
             },
             leadingContent = {
                 Icon(Icons.Outlined.ColorLens, null, tint = MaterialTheme.colorScheme.onPrimary)
+            }
+        )
+        // AMOLED Mode
+        ListItem(
+            modifier = Modifier
+                .clickable { onAmoledModeChange(!amoledMode) },
+            headlineContent = {
+                Text(text = stringResource(id = R.string.amoled_mode))
+            },
+            supportingContent = {
+                Text(text = stringResource(id = R.string.amoled_mode_description))
+            },
+            leadingContent = {
+                Icon(
+                    Icons.Outlined.Contrast,
+                    null,
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            },
+            trailingContent = {
+                Switch(
+                    checked = amoledMode,
+                    onCheckedChange = onAmoledModeChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorApp.accent,
+                        checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
+                    )
+                )
             }
         )
     }

@@ -56,6 +56,7 @@ fun SettingsScreen() {
                 onFollowSystem = viewModel::onFollowSystemChange,
                 onThemeSelected = viewModel::onThemeChange,
                 onBookDynamicThemeChange = viewModel::onBookDynamicThemeChange,
+                onAmoledModeChange = viewModel::onAmoledModeChange,
                 onCleanDatabase = viewModel::cleanDatabase,
                 onCleanImageFolder = viewModel::cleanImagesFolder,
                 onSyncWithServer = viewModel::syncWithServer,

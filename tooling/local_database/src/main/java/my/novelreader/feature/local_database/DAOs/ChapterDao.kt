@@ -99,4 +99,10 @@ interface ChapterDao {
     """
     )
     suspend fun getChaptersWithoutBody(bookUrl: String): List<Chapter>
+
+    @Query("UPDATE Chapter SET bookmarked = :bookmarked WHERE url = :chapterUrl")
+    suspend fun setBookmarked(chapterUrl: String, bookmarked: Boolean)
+
+    @Query("UPDATE Chapter SET lastReadMangaPage = :pageIndex WHERE url = :chapterUrl")
+    suspend fun updateLastReadMangaPage(chapterUrl: String, pageIndex: Int)
 }

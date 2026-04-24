@@ -34,6 +34,9 @@ import my.novelreader.scraper.sources.Ddxss
 import my.novelreader.scraper.sources.LeYueDu
 import my.novelreader.scraper.sources.Twkan
 import my.novelreader.scraper.sources.Ttkan
+import my.novelreader.scraper.sources.MangaDex
+import my.novelreader.scraper.sources.KingOfShojo
+import my.novelreader.scraper.sources.AsuraScans
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -80,6 +83,9 @@ class Scraper @Inject constructor(
         NewNovel(networkClient),
         NoBadNovel(networkClient),
         WtrLab(networkClient),
+        MangaDex(networkClient),
+        KingOfShojo(networkClient),
+        AsuraScans(networkClient),
     )
 
     val sourcesCatalogsList = sourcesList.filterIsInstance<SourceInterface.Catalog>()

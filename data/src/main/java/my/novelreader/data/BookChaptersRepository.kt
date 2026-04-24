@@ -58,4 +58,9 @@ class BookChaptersRepository @Inject constructor(
 
     suspend fun chaptersCount(bookUrl: String) = chapterDao.chaptersCount(bookUrl)
     suspend fun getChaptersWithoutBody(bookUrl: String) = chapterDao.getChaptersWithoutBody(bookUrl)
+    suspend fun setBookmarked(chapterUrl: String, bookmarked: Boolean) =
+        chapterDao.setBookmarked(chapterUrl, bookmarked)
+
+    suspend fun updateLastReadMangaPage(chapterUrl: String, pageIndex: Int) =
+        chapterDao.updateLastReadMangaPage(chapterUrl, pageIndex)
 }

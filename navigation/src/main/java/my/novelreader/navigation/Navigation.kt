@@ -22,6 +22,12 @@ interface NavigationRoutes {
         scrollToSpeakingItem: Boolean = false
     ): Intent
 
+    fun mangaReader(
+        context: Context,
+        bookUrl: String,
+        chapterUrl: String,
+    ): Intent
+
     fun databaseSearch(
         context: Context,
         input: String,

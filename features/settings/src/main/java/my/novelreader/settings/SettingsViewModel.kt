@@ -59,6 +59,7 @@ internal class SettingsViewModel @Inject constructor(
         followsSystemTheme = appPreferences.THEME_FOLLOW_SYSTEM.state(viewModelScope),
         currentTheme = derivedStateOf { themeId.toTheme },
         bookDynamicThemeEnabled = appPreferences.BOOK_DYNAMIC_THEME_ENABLED.state(viewModelScope),
+        amoledMode = appPreferences.AMOLED_MODE_ENABLED.state(viewModelScope),
         isTranslationSettingsVisible = mutableStateOf(translationManager.available),
         translationModelsStates = translationManager.models,
         updateAppSetting = SettingsScreenState.UpdateApp(
@@ -235,6 +236,10 @@ internal class SettingsViewModel @Inject constructor(
                 }
             state.updateAppSetting.checkingForNewVersion.value = false
         }
+    }
+
+    fun onAmoledModeChange(enabled: Boolean) {
+        appPreferences.AMOLED_MODE_ENABLED.value = enabled
     }
 }
 

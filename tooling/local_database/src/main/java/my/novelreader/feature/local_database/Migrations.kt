@@ -62,6 +62,77 @@ internal fun databaseMigrations() = arrayOf(
     migration(12) {
         it.execSQL("CREATE INDEX IF NOT EXISTS index_Chapter_bookUrl ON Chapter (bookUrl)")
     },
+    migration(13) {
+        it.execSQL("ALTER TABLE Book ADD COLUMN contentType TEXT NOT NULL DEFAULT 'NOVEL'")
+    },
+    migration(14) {
+        // Create Category table for organizing books
+        it.execSQL("""
+            CREATE TABLE IF NOT EXISTS Category (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL,
+                sortOrder INTEGER NOT NULL,
+                flags INTEGER NOT NULL,
+                contentType TEXT NOT NULL
+            )
+        """)
+
+        // Create BookCategory junction table
+        it.execSQL("""
+            CREATE TABLE IF NOT EXISTS BookCategory (
+                bookUrl TEXT NOT NULL,
+                categoryId INTEGER NOT NULL,
+                addedEpochTimeMilli INTEGER NOT NULL,
+                PRIMARY KEY (bookUrl, categoryId),
+                FOREIGN KEY (bookUrl) REFERENCES Book(url) ON DELETE CASCADE,
+                FOREIGN KEY (categoryId) REFERENCES Category(id) ON DELETE CASCADE
+            )
+        """)
+        // Create indices for BookCategory
+        it.execSQL("CREATE INDEX IF NOT EXISTS index_BookCategory_categoryId ON BookCategory (categoryId)")
+        it.execSQL("CREATE INDEX IF NOT EXISTS index_BookCategory_bookUrl ON BookCategory (bookUrl)")
+        it.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_BookCategory_bookUrl_categoryId ON BookCategory (bookUrl, categoryId)")
+
+        // Insert default category (cannot be deleted, always exists)
+        it.execSQL("INSERT INTO Category (id, name, sortOrder, flags, contentType) VALUES (0, 'Default', 0, 0, 'NOVEL')")
+    },
+    migration(15) {
+        // Add bookmarked column to Chapter table for marking favorite chapters
+        it.execSQL("ALTER TABLE Chapter ADD COLUMN bookmarked INTEGER NOT NULL DEFAULT 0")
+    },
+    migration(16) {
+        // Create SavedSearch table for saved search queries
+        it.execSQL("""
+            CREATE TABLE IF NOT EXISTS SavedSearch (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                sourceId TEXT NOT NULL,
+                query TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                isPinned INTEGER NOT NULL
+            )
+        """)
+        // Create index on sourceId for quick lookups
+        it.execSQL("CREATE INDEX IF NOT EXISTS index_SavedSearch_sourceId ON SavedSearch (sourceId)")
+    },
+    migration(17) {
+        // Create LibraryUpdateError table for tracking update failures
+        it.execSQL("""
+            CREATE TABLE IF NOT EXISTS LibraryUpdateError (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                bookUrl TEXT NOT NULL,
+                errorMessage TEXT NOT NULL,
+                errorType TEXT NOT NULL,
+                attemptCount INTEGER NOT NULL DEFAULT 1,
+                lastAttemptTime INTEGER NOT NULL
+            )
+        """)
+        // Create index on bookUrl for quick lookups
+        it.execSQL("CREATE INDEX IF NOT EXISTS index_LibraryUpdateError_bookUrl ON LibraryUpdateError (bookUrl)")
+    },
+    migration(18) {
+        // Add lastReadMangaPage column for manga reader position tracking
+        it.execSQL("ALTER TABLE Chapter ADD COLUMN lastReadMangaPage INTEGER NOT NULL DEFAULT 0")
+    },
 )
 
 internal fun migration(vi: Int, migrate: (SupportSQLiteDatabase) -> Unit) =

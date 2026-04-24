@@ -9,7 +9,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -39,7 +41,8 @@ internal fun ChaptersScreenChapterItem(
     modifier: Modifier = Modifier,
     onLongClick: () -> Unit,
     onClick: () -> Unit,
-    onDownload: () -> Unit
+    onDownload: () -> Unit,
+    onBookmarkChange: (Boolean) -> Unit = {}
 ) {
     val chapter = chapterWithContext.chapter
     ListItem(
@@ -66,6 +69,13 @@ internal fun ChaptersScreenChapterItem(
         },
         trailingContent = if (isLocalSource) null else {
             {
+                IconButton(onClick = { onBookmarkChange(!chapter.bookmarked) }) {
+                    Icon(
+                        if (chapter.bookmarked) Icons.Filled.Bookmark
+                        else Icons.Outlined.BookmarkBorder,
+                        null
+                    )
+                }
                 IconButton(onClick = onDownload) {
                     Icon(
                         if (chapterWithContext.downloaded) Icons.Filled.CloudDownload
@@ -102,7 +112,8 @@ private fun PreviewView(
             isLocalSource = false,
             onLongClick = {},
             onClick = {},
-            onDownload = {}
+            onDownload = {},
+            onBookmarkChange = {}
         )
     }
 }

@@ -6,7 +6,8 @@
       "WebFetch(domain:novelbin.com)",
       "WebFetch(domain:novelbin.me)",
       "Read(//b/NovelApp/**)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Read(//b/komikku/app/src/main/java/eu/kanade/tachiyomi/source/online/all/**)"
     ],
     "additionalDirectories": [
       "B:\\NovelApp\\src"

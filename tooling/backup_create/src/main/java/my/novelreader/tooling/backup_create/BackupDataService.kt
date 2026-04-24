@@ -12,6 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import my.novelreader.coreui.states.NotificationsCenter
 import my.novelreader.coreui.states.removeProgressBar
 import my.novelreader.coreui.states.text
@@ -136,6 +138,17 @@ internal class BackupDataService : Service() {
                 text = getString(R.string.copying_database)
             }
 
+            // Save backup manifest with version
+            run {
+                val manifest = mapOf("version" to 2)
+                val manifestJson = Json.encodeToString(manifest)
+                val entry = ZipEntry("manifest.json")
+                entry.method = ZipOutputStream.DEFLATED
+                zip.putNextEntry(entry)
+                zip.write(manifestJson.toByteArray())
+                zip.closeEntry()
+            }
+
             // Save database
             run {
                 val entry = ZipEntry("database.sqlite3")
@@ -144,6 +157,51 @@ internal class BackupDataService : Service() {
                 file.inputStream().use {
                     zip.putNextEntry(entry)
                     it.copyTo(zip)
+                }
+            }
+
+            // Save categories as JSON sidecar
+            run {
+                try {
+                    val categories = appDatabase.categoryDao().getAll()
+                    val categoriesJson = Json.encodeToString(categories)
+                    val entry = ZipEntry("categories.json")
+                    entry.method = ZipOutputStream.DEFLATED
+                    zip.putNextEntry(entry)
+                    zip.write(categoriesJson.toByteArray())
+                    zip.closeEntry()
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to export categories")
+                }
+            }
+
+            // Save book categories as JSON sidecar
+            run {
+                try {
+                    val bookCategories = appDatabase.bookCategoryDao().getAll()
+                    val bookCategoriesJson = Json.encodeToString(bookCategories)
+                    val entry = ZipEntry("book_categories.json")
+                    entry.method = ZipOutputStream.DEFLATED
+                    zip.putNextEntry(entry)
+                    zip.write(bookCategoriesJson.toByteArray())
+                    zip.closeEntry()
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to export book categories")
+                }
+            }
+
+            // Save saved searches as JSON sidecar
+            run {
+                try {
+                    val savedSearches = appDatabase.savedSearchDao().getAll()
+                    val savedSearchesJson = Json.encodeToString(savedSearches)
+                    val entry = ZipEntry("saved_searches.json")
+                    entry.method = ZipOutputStream.DEFLATED
+                    zip.putNextEntry(entry)
+                    zip.write(savedSearchesJson.toByteArray())
+                    zip.closeEntry()
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to export saved searches")
                 }
             }
 

@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.novelreader.android.library)
     alias(libs.plugins.novelreader.android.compose)
     alias(libs.plugins.kotlin.parcelize)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -16,6 +17,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.jsoup)
     implementation(libs.gson)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     androidTestImplementation(libs.test.androidx.espresso.core)
 }

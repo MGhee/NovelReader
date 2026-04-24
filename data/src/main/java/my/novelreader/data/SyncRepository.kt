@@ -2,6 +2,7 @@ package my.novelreader.data
 
 import my.novelreader.core.Response
 import my.novelreader.feature.local_database.tables.Book
+import my.novelreader.feature.local_database.tables.ContentType
 import my.novelreader.network.NetworkClient
 import my.novelreader.network.ScraperNetworkClient
 import okhttp3.MediaType.Companion.toMediaType
@@ -406,6 +407,7 @@ class SyncRepository @Inject constructor(
                                 inLibrary = true,
                                 coverImageUrl = serverBook.coverUrl ?: "",
                                 description = serverBook.description ?: "",
+                                contentType = ContentType.NOVEL
                             )
                         )
                         created++

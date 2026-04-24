@@ -110,6 +110,39 @@ val sepia_appColor = AppColor(
     navBarSurface = NavSurfaceSepia,
 )
 
+/**
+ * Shared shape for the four preset themes (Ocean, Forest, Sunset, Purple).
+ * Keeps the AppColor accents in lockstep with the same accent used inside
+ * the matching ColorScheme — that's how we avoid the "two color schemas"
+ * problem where Material primary and `colorApp.accent` disagreed.
+ */
+private fun tintedDarkAppColor(
+    accent: Color,
+    bg900: Color,
+    bg800: Color,
+    navSurface: Color,
+): AppColor = AppColor(
+    tabSurface = bg800,
+    bookSurface = bg800,
+    checkboxPositive = Success500,
+    checkboxNegative = Error500,
+    checkboxNeutral = bg900,
+    tintedSurface = bg900.mix(accent, 0.65f),
+    tintedSelectedSurface = bg900.mix(accent, 0.75f),
+    accent = accent,
+    accentVariant = accent.mix(bg900, 0.4f),
+    calendarHeat1 = bg900.mix(accent, 0.75f),  // 25% accent
+    calendarHeat2 = bg900.mix(accent, 0.50f),  // 50% accent
+    calendarHeat3 = bg900.mix(accent, 0.30f),  // 70% accent
+    calendarHeat4 = accent,                    // 100% accent
+    navBarSurface = navSurface,
+)
+
+val ocean_appColor = tintedDarkAppColor(AccentOcean, OceanBg900, OceanBg800, NavSurfaceOcean)
+val forest_appColor = tintedDarkAppColor(AccentForest, ForestBg900, ForestBg800, NavSurfaceForest)
+val sunset_appColor = tintedDarkAppColor(AccentSunset, SunsetBg900, SunsetBg800, NavSurfaceSunset)
+val purple_appColor = tintedDarkAppColor(AccentPurple, PurpleBg900, PurpleBg800, NavSurfacePurple)
+
 val LocalAppColor = compositionLocalOf { light_appColor }
 
 @Suppress("UnusedReceiverParameter")

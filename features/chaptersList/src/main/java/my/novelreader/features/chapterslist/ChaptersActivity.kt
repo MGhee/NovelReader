@@ -3,6 +3,7 @@ package my.novelreader.features.chapterslist
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.core.view.WindowCompat
@@ -14,8 +15,12 @@ import my.novelreader.coreui.composableActions.SetSystemBarTransparent
 import my.novelreader.coreui.composableActions.onDoAskForImage
 import my.novelreader.coreui.theme.Theme
 import my.novelreader.core.utils.Extra_String
+import my.novelreader.data.AppRepository
+import my.novelreader.feature.local_database.tables.ContentType
 import my.novelreader.navigation.NavigationRoutes
 import my.novelreader.feature.local_database.BookMetadata
+import my.novelreader.scraper.MangaSourceInterface
+import my.novelreader.scraper.Scraper
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -36,6 +41,12 @@ class ChaptersActivity : BaseActivity() {
 
     @Inject
     internal lateinit var navigationRoutes: NavigationRoutes
+
+    @Inject
+    internal lateinit var appRepository: AppRepository
+
+    @Inject
+    internal lateinit var scraper: Scraper
 
     private val viewModel by viewModels<ChaptersViewModel>()
 
@@ -65,6 +76,7 @@ class ChaptersActivity : BaseActivity() {
                     onSelectionModeChapterClick = viewModel::onSelectionModeChapterClick,
                     onSelectionModeChapterLongClick = viewModel::onSelectionModeChapterLongClick,
                     onChapterDownload = viewModel::onChapterDownload,
+                    onChapterBookmarkChange = viewModel::onChapterBookmarkChange,
                     onPullRefresh = viewModel::onPullRefresh,
                     onCoverLongClick = { searchBookInDatabase(input = viewModel.bookTitle) },
                     onChangeCover = onDoAskForImage { viewModel.saveImageAsCover(it) },
@@ -92,7 +104,29 @@ class ChaptersActivity : BaseActivity() {
         input = input
     ).let(::startActivity)
 
-    private fun openBookAtChapter(chapterUrl: String) = navigationRoutes.reader(
-        this, bookUrl = viewModel.state.book.value.url, chapterUrl = chapterUrl
-    ).let(::startActivity)
+    private fun openBookAtChapter(chapterUrl: String) {
+        lifecycleScope.launch {
+            val bookUrl = viewModel.state.book.value.url
+            val book = appRepository.libraryBooks.get(bookUrl)
+            val detectedSource = scraper.getCompatibleSource(bookUrl)
+
+            Log.d("ChaptersActivity", "openBookAtChapter: bookUrl=$bookUrl")
+            Log.d("ChaptersActivity", "openBookAtChapter: book.contentType=${book?.contentType}")
+            Log.d("ChaptersActivity", "openBookAtChapter: detectedSource=${detectedSource?.id}, isMangaSource=${detectedSource is MangaSourceInterface}")
+
+            // Check contentType from DB, fallback to source detection
+            val isManga = book?.contentType == ContentType.MANGA
+                || detectedSource is MangaSourceInterface
+
+            Log.d("ChaptersActivity", "openBookAtChapter: isManga=$isManga")
+
+            val intent = if (isManga) {
+                navigationRoutes.mangaReader(this@ChaptersActivity, bookUrl = bookUrl, chapterUrl = chapterUrl)
+            } else {
+                navigationRoutes.reader(this@ChaptersActivity, bookUrl = bookUrl, chapterUrl = chapterUrl)
+            }
+
+            startActivity(intent)
+        }
+    }
 }

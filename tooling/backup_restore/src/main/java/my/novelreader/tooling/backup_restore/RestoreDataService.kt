@@ -14,6 +14,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import my.novelreader.coreui.states.NotificationsCenter
 import my.novelreader.coreui.states.removeProgressBar
 import my.novelreader.coreui.states.text
@@ -29,6 +32,9 @@ import my.novelreader.core.tryAsResponse
 import my.novelreader.core.utils.Extra_Uri
 import my.novelreader.core.utils.isServiceRunning
 import my.novelreader.feature.local_database.AppDatabase
+import my.novelreader.feature.local_database.tables.BookCategory
+import my.novelreader.feature.local_database.tables.Category
+import my.novelreader.feature.local_database.tables.SavedSearch
 import okhttp3.internal.closeQuietly
 import timber.log.Timber
 import java.io.File
@@ -45,6 +51,9 @@ class RestoreDataService : Service() {
 
     @Inject
     lateinit var appRepository: AppRepository
+
+    @Inject
+    lateinit var appDatabase: AppDatabase
 
     @Inject
     lateinit var appFileResolver: AppFileResolver
@@ -136,6 +145,61 @@ class RestoreDataService : Service() {
             stopSelf(startId)
         }
         return START_STICKY
+    }
+
+    private suspend fun restoreJsonSidecars(
+        zipSequence: Map<ZipEntry, ByteArray>,
+        backupVersion: Int
+    ) {
+        if (backupVersion < 2) {
+            Timber.d("restoreJsonSidecars: Backup version is $backupVersion, skipping JSON sidecars")
+            return
+        }
+
+        // Restore categories
+        zipSequence.entries.find { it.key.name == "categories.json" }?.let { (_, data) ->
+            try {
+                Timber.d("restoreJsonSidecars: Restoring categories from JSON")
+                val json = String(data, Charsets.UTF_8)
+                val categories = Json.decodeFromString<List<Category>>(json)
+                appDatabase.categoryDao().apply {
+                    categories.forEach { insert(it) }
+                }
+                Timber.d("restoreJsonSidecars: Restored ${categories.size} categories")
+            } catch (e: Exception) {
+                Timber.e(e, "restoreJsonSidecars: Failed to restore categories")
+            }
+        }
+
+        // Restore book categories
+        zipSequence.entries.find { it.key.name == "book_categories.json" }?.let { (_, data) ->
+            try {
+                Timber.d("restoreJsonSidecars: Restoring book categories from JSON")
+                val json = String(data, Charsets.UTF_8)
+                val bookCategories = Json.decodeFromString<List<BookCategory>>(json)
+                appDatabase.bookCategoryDao().apply {
+                    bookCategories.forEach { insert(it) }
+                }
+                Timber.d("restoreJsonSidecars: Restored ${bookCategories.size} book categories")
+            } catch (e: Exception) {
+                Timber.e(e, "restoreJsonSidecars: Failed to restore book categories")
+            }
+        }
+
+        // Restore saved searches
+        zipSequence.entries.find { it.key.name == "saved_searches.json" }?.let { (_, data) ->
+            try {
+                Timber.d("restoreJsonSidecars: Restoring saved searches from JSON")
+                val json = String(data, Charsets.UTF_8)
+                val savedSearches = Json.decodeFromString<List<SavedSearch>>(json)
+                appDatabase.savedSearchDao().apply {
+                    savedSearches.forEach { insert(it) }
+                }
+                Timber.d("restoreJsonSidecars: Restored ${savedSearches.size} saved searches")
+            } catch (e: Exception) {
+                Timber.e(e, "restoreJsonSidecars: Failed to restore saved searches")
+            }
+        }
     }
 
     /**
@@ -449,13 +513,26 @@ class RestoreDataService : Service() {
             }
         }
 
+        // Read backup version from manifest
+        var backupVersion = 1
+        zipSequence.entries.find { it.key.name == "manifest.json" }?.let { (_, data) ->
+            try {
+                val json = String(data, Charsets.UTF_8)
+                val manifest = Json.parseToJsonElement(json).jsonObject
+                backupVersion = manifest["version"]?.toString()?.toIntOrNull() ?: 1
+                Timber.d("restoreData: Read backup version: $backupVersion")
+            } catch (e: Exception) {
+                Timber.w(e, "restoreData: Failed to read manifest, assuming version 1")
+            }
+        }
+
         notificationsCenter.modifyNotification(
             notificationBuilder,
             notificationId = notificationId
         ) {
             text = getString(R.string.adding_images)
         }
-        
+
         Timber.d("restoreData: Processing ${zipSequence.size} ZIP entries")
         for ((entry, file) in zipSequence) {
             try {
@@ -480,6 +557,9 @@ class RestoreDataService : Service() {
                 // Continue with other entries
             }
         }
+
+        // Restore JSON sidecars (v2+)
+        restoreJsonSidecars(zipSequence, backupVersion)
 
         inputStream.closeQuietly()
         Timber.d("restoreData: Restore process completed, closed input stream")

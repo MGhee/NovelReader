@@ -13,6 +13,8 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
@@ -668,54 +670,53 @@ class ReaderActivity : BaseActivity() {
             Theme(themeProvider) {
                 SetSystemBarTransparent()
 
-                // Reader info
                 ReaderScreen(
-                    state = viewModel.state,
-                    onTextFontChanged = { appPreferences.READER_FONT_FAMILY.value = it },
-                    onTextSizeChanged = { appPreferences.READER_FONT_SIZE.value = it },
-                    onSelectableTextChange = { appPreferences.READER_SELECTABLE_TEXT.value = it },
-                    onKeepScreenOn = { appPreferences.READER_KEEP_SCREEN_ON.value = it },
-                    onFollowSystem = { appPreferences.THEME_FOLLOW_SYSTEM.value = it },
-                    onThemeSelected = { appPreferences.THEME_ID.value = it.toPreferenceTheme },
-                    onReaderThemeSelected = { appPreferences.READER_THEME_ID.value = it.toPreferenceTheme },
-                    onFullScreen = { appPreferences.READER_FULL_SCREEN.value = it },
-                    onOrientationChange = {
-                        appPreferences.READER_ORIENTATION.value = it
-                        applyReaderOrientation()
-                    },
-                    onTextIndentChange = { appPreferences.READER_TEXT_INDENT.value = it },
-                    onMarginLevelChange = { appPreferences.READER_MARGIN_LEVEL.value = it },
-                    onLineSpacingLevelChange = { appPreferences.READER_LINE_SPACING_LEVEL.value = it },
-                    onLineBreakHeightChange = { appPreferences.READER_LINE_BREAK_HEIGHT.value = it },
-                    onPressBack = {
-                        viewModel.onCloseManually()
-                        finish()
-                    },
-                    onOpenChapterInWeb = {
-                        val url = viewModel.state.readerInfo.chapterUrl.value
-                        if (url.isNotBlank()) {
-                            navigationRoutes.webView(this, url = url).let(::startActivity)
-                        }
-                    },
-                    onOpenChapter = viewModel::openChapterFromList,
-                    onDownloadChapter = viewModel::downloadChapterFromList,
-                    onNavigateToNextChapter = {
-                        if (isHorizontalMode()) navigateToNextChapterHorizontal()
-                        else viewModel.navigateToNextChapter()
-                    },
-                    onNavigateToPreviousChapter = {
-                        if (isHorizontalMode()) navigateToPreviousChapterHorizontal()
-                        else viewModel.navigateToPreviousChapter()
-                    },
-                    onOpenChaptersList = {
-                        viewModel.state.showChapterList.value = true
-                    },
-                    onDownloadAllChapters = viewModel::downloadAllChapters,
-                    onDeleteAllChapters = viewModel::deleteAllChapters,
-                    readerContent = {
-                        AndroidView(factory = { viewBind.root })
-                    },
-                )
+                        state = viewModel.state,
+                        onTextFontChanged = { appPreferences.READER_FONT_FAMILY.value = it },
+                        onTextSizeChanged = { appPreferences.READER_FONT_SIZE.value = it },
+                        onSelectableTextChange = { appPreferences.READER_SELECTABLE_TEXT.value = it },
+                        onKeepScreenOn = { appPreferences.READER_KEEP_SCREEN_ON.value = it },
+                        onFollowSystem = { appPreferences.THEME_FOLLOW_SYSTEM.value = it },
+                        onThemeSelected = { appPreferences.THEME_ID.value = it.toPreferenceTheme },
+                        onReaderThemeSelected = { appPreferences.READER_THEME_ID.value = it.toPreferenceTheme },
+                        onFullScreen = { appPreferences.READER_FULL_SCREEN.value = it },
+                        onOrientationChange = {
+                            appPreferences.READER_ORIENTATION.value = it
+                            applyReaderOrientation()
+                        },
+                        onTextIndentChange = { appPreferences.READER_TEXT_INDENT.value = it },
+                        onMarginLevelChange = { appPreferences.READER_MARGIN_LEVEL.value = it },
+                        onLineSpacingLevelChange = { appPreferences.READER_LINE_SPACING_LEVEL.value = it },
+                        onLineBreakHeightChange = { appPreferences.READER_LINE_BREAK_HEIGHT.value = it },
+                        onPressBack = {
+                            viewModel.onCloseManually()
+                            finish()
+                        },
+                        onOpenChapterInWeb = {
+                            val url = viewModel.state.readerInfo.chapterUrl.value
+                            if (url.isNotBlank()) {
+                                navigationRoutes.webView(this, url = url).let(::startActivity)
+                            }
+                        },
+                        onOpenChapter = viewModel::openChapterFromList,
+                        onDownloadChapter = viewModel::downloadChapterFromList,
+                        onNavigateToNextChapter = {
+                            if (isHorizontalMode()) navigateToNextChapterHorizontal()
+                            else viewModel.navigateToNextChapter()
+                        },
+                        onNavigateToPreviousChapter = {
+                            if (isHorizontalMode()) navigateToPreviousChapterHorizontal()
+                            else viewModel.navigateToPreviousChapter()
+                        },
+                        onOpenChaptersList = {
+                            viewModel.state.showChapterList.value = true
+                        },
+                        onDownloadAllChapters = viewModel::downloadAllChapters,
+                        onDeleteAllChapters = viewModel::deleteAllChapters,
+                        readerContent = {
+                            AndroidView(factory = { viewBind.root })
+                        },
+                    )
 
                 if (viewModel.state.showInvalidChapterDialog.value) {
                     BasicAlertDialog(onDismissRequest = {

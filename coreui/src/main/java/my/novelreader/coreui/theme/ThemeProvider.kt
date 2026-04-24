@@ -12,4 +12,6 @@ interface ThemeProvider {
     fun bookSeedColor(stateCoroutineScope: CoroutineScope): State<Int?>
 
     fun setActiveBookSeedColor(seedColor: Int?)
+
+    fun amoledMode(stateCoroutineScope: CoroutineScope): State<Boolean>
 }

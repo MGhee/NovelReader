@@ -14,11 +14,38 @@ val AccentDark = Color(0xFFD0BCFF)      // light lavender, visible on dark grey
 val AccentBlack = Color(0xFFE8DEF8)     // lighter for true black
 val AccentSepia = Color(0xFFA0785A)     // warm brown matching sepia family
 
+// Preset accent colors (used by both colorScheme and appColor in lockstep)
+val AccentOcean = Color(0xFF4FC3F7)     // cyan
+val AccentForest = Color(0xFF81C784)    // soft green
+val AccentSunset = Color(0xFFFF8A65)    // warm orange-coral
+val AccentPurple = Color(0xFFCE93D8)    // light violet
+
+// Preset background tones (deep tinted darks distinct from neutral grey)
+val OceanBg900 = Color(0xFF0E1B2B)      // deep navy
+val OceanBg800 = Color(0xFF152538)
+val OceanBg700 = Color(0xFF1C3046)
+
+val ForestBg900 = Color(0xFF0E1F14)     // deep forest
+val ForestBg800 = Color(0xFF15291C)
+val ForestBg700 = Color(0xFF1C3324)
+
+val SunsetBg900 = Color(0xFF1F1411)     // deep warm brown
+val SunsetBg800 = Color(0xFF2A1B17)
+val SunsetBg700 = Color(0xFF35221C)
+
+val PurpleBg900 = Color(0xFF170F1F)     // deep violet-grey
+val PurpleBg800 = Color(0xFF1F1729)
+val PurpleBg700 = Color(0xFF281E33)
+
 // Nav bar surfaces (distinct from background)
 val NavSurfaceLight = Color(0xFFEFEFEF)    // = Grey75, visibly darker than Grey25
 val NavSurfaceDark = Color(0xFF1A1A1A)     // lighter than Grey900
 val NavSurfaceBlack = Color(0xFF141414)    // lift from true black
 val NavSurfaceSepia = Color(0xFFEDD9C3)    // darker than SepiaLight
+val NavSurfaceOcean = Color(0xFF182A40)
+val NavSurfaceForest = Color(0xFF182E20)
+val NavSurfaceSunset = Color(0xFF2E1F19)
+val NavSurfacePurple = Color(0xFF221A2D)
 
 val Grey0 = Color(0xFFFFFFFF)
 val Grey25 = Color(0xFFFEFEFE)

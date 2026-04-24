@@ -11,6 +11,10 @@ fun generateBookColorScheme(seedColor: Int, baseTheme: Themes): ColorScheme {
         Themes.BLACK -> black_colorScheme
         Themes.DARK_TEAL -> darkTeal_colorScheme
         Themes.SEPIA -> sepia_colorScheme
+        Themes.OCEAN -> ocean_colorScheme
+        Themes.FOREST -> forest_colorScheme
+        Themes.SUNSET -> sunset_colorScheme
+        Themes.PURPLE -> purple_colorScheme
     }
 
     // Blend the seed color into accent-related roles and subtly tint structural colors.
@@ -57,6 +61,10 @@ fun generateBookAppColor(seedColor: Int, baseTheme: Themes): AppColor {
         Themes.BLACK -> black_appColor
         Themes.DARK_TEAL -> darkTeal_appColor
         Themes.SEPIA -> sepia_appColor
+        Themes.OCEAN -> ocean_appColor
+        Themes.FOREST -> forest_appColor
+        Themes.SUNSET -> sunset_appColor
+        Themes.PURPLE -> purple_appColor
     }
 
     val baseColorForBlend = when (baseTheme) {
@@ -65,6 +73,10 @@ fun generateBookAppColor(seedColor: Int, baseTheme: Themes): AppColor {
         Themes.BLACK -> Grey1000
         Themes.DARK_TEAL -> TealDark900
         Themes.SEPIA -> SepiaLight
+        Themes.OCEAN -> OceanBg900
+        Themes.FOREST -> ForestBg900
+        Themes.SUNSET -> SunsetBg900
+        Themes.PURPLE -> PurpleBg900
     }
 
     // Generate 4 calendar heat intensities from book color (not blended with green base)

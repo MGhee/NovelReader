@@ -37,7 +37,7 @@ interface ReaderStateBundle {
 @HiltViewModel
 internal class ReaderViewModel @Inject constructor(
     stateHandler: SavedStateHandle,
-    appPreferences: AppPreferences,
+    private val appPreferences: AppPreferences,
     private val appRepository: AppRepository,
     private val readerManager: ReaderManager,
     readerViewHandlersActions: ReaderViewHandlersActions,

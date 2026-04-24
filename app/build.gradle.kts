@@ -102,6 +102,7 @@ dependencies {
     implementation(projects.tooling.localSource)
 
     implementation(projects.features.reader)
+    implementation(projects.features.mangaReader)
     implementation(projects.features.chaptersList)
     implementation(projects.features.globalSourceSearch)
     implementation(projects.features.personal)

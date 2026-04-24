@@ -133,6 +133,10 @@ internal fun StyleSettingDialog(
                                     Themes.BLACK -> Color(0xFF000000)
                                     Themes.DARK_TEAL -> Color(0xFF0A3D4A)
                                     Themes.SEPIA -> Color(0xFFF4E5D3)
+                                    Themes.OCEAN -> Color(0xFF0B2A3D)
+                                    Themes.FOREST -> Color(0xFF142A1F)
+                                    Themes.SUNSET -> Color(0xFF2A1410)
+                                    Themes.PURPLE -> Color(0xFF1F0F2A)
                                 }
                                 val textColor = when (theme) {
                                     Themes.LIGHT, Themes.SEPIA -> Color(0xFF333333)

@@ -21,8 +21,11 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import my.novelreader.data.BookChaptersRepository
 import my.novelreader.data.ChapterBodyRepository
+import my.novelreader.data.MangaImagePrefetcher
 import my.novelreader.core.Response
 import my.novelreader.feature.local_database.tables.ChapterBody
+import my.novelreader.scraper.MangaSourceInterface
+import my.novelreader.scraper.Scraper
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -34,6 +37,8 @@ internal class ChapterDownloadWorker @AssistedInject constructor(
     @Assisted workerParameters: WorkerParameters,
     private val chapterBodyRepository: ChapterBodyRepository,
     private val bookChaptersRepository: BookChaptersRepository,
+    private val scraper: Scraper,
+    private val mangaImagePrefetcher: MangaImagePrefetcher,
 ) : CoroutineWorker(context, workerParameters) {
 
     companion object {
@@ -90,6 +95,17 @@ internal class ChapterDownloadWorker @AssistedInject constructor(
                         .putInt("total", totalChapters)
                         .build()
                 )
+
+                val source = scraper.getCompatibleSource(bookUrl)
+                if (source is MangaSourceInterface) {
+                    return@withContext downloadMangaChapters(
+                        bookUrl = bookUrl,
+                        chapterUrls = chaptersToDownload.map { it.url },
+                        source = source,
+                        totalChapters = totalChapters,
+                        alreadyDownloaded = alreadyDownloaded,
+                    )
+                }
 
                 val semaphore = Semaphore(60)
                 val downloadedCount = AtomicInteger(0)
@@ -161,5 +177,53 @@ internal class ChapterDownloadWorker @AssistedInject constructor(
             is Response.Success -> result.data
             else -> null
         }
+    }
+
+    private suspend fun downloadMangaChapters(
+        bookUrl: String,
+        chapterUrls: List<String>,
+        source: MangaSourceInterface,
+        totalChapters: Int,
+        alreadyDownloaded: Int,
+    ): Result = coroutineScope {
+        val semaphore = Semaphore(4)
+        val downloadedCount = AtomicInteger(0)
+        val failedCount = AtomicInteger(0)
+
+        chapterUrls.map { chapterUrl ->
+            async {
+                semaphore.withPermit {
+                    runCatching {
+                        when (val result = source.getChapterImages(chapterUrl)) {
+                            is Response.Success -> {
+                                val allOk = mangaImagePrefetcher.prefetchAndAwait(result.data)
+                                if (allOk) {
+                                    chapterBodyRepository.saveMangaChapterPages(chapterUrl, result.data)
+                                    true
+                                } else {
+                                    Timber.w("ChapterDownloadWorker(manga): incomplete prefetch for $chapterUrl, skipping save")
+                                    false
+                                }
+                            }
+                            else -> false
+                        }
+                    }.getOrDefault(false)
+                }
+            }
+        }.forEach { task ->
+            val ok = task.await()
+            if (ok) downloadedCount.incrementAndGet() else failedCount.incrementAndGet()
+
+            setProgress(
+                Data.Builder()
+                    .putString("bookUrl", bookUrl)
+                    .putInt("progress", alreadyDownloaded + downloadedCount.get())
+                    .putInt("total", totalChapters)
+                    .build()
+            )
+        }
+
+        Timber.d("ChapterDownloadWorker(manga): completed. Downloaded ${downloadedCount.get()}/${chapterUrls.size} chapters for $bookUrl")
+        Result.success()
     }
 }

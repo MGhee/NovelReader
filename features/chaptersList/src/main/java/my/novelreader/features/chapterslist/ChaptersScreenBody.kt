@@ -37,6 +37,7 @@ internal fun ChaptersScreenBody(
     onChapterClick: (chapter: ChapterWithContext) -> Unit,
     onChapterLongClick: (chapter: ChapterWithContext) -> Unit,
     onChapterDownload: (chapter: ChapterWithContext) -> Unit,
+    onChapterBookmarkChange: (chapter: ChapterWithContext, bookmarked: Boolean) -> Unit = { _, _ -> },
     onPullRefresh: () -> Unit,
     onCoverLongClick: () -> Unit,
     onGlobalSearchClick: (input: String) -> Unit,
@@ -91,7 +92,8 @@ internal fun ChaptersScreenBody(
                     isLocalSource = state.isLocalSource.value,
                     onClick = { onChapterClick(it) },
                     onLongClick = { onChapterLongClick(it) },
-                    onDownload = { onChapterDownload(it) }
+                    onDownload = { onChapterDownload(it) },
+                    onBookmarkChange = { bookmarked -> onChapterBookmarkChange(it, bookmarked) }
                 )
             }
 

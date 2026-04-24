@@ -11,6 +11,8 @@ import my.novelreader.data.AppRemoteRepository
 import my.novelreader.data.SyncRepository
 import my.novelreader.data.BookChaptersRepository
 import my.novelreader.data.ChapterBodyRepository
+import my.novelreader.data.MangaImagePrefetcher
+import my.novelreader.scraper.Scraper
 import my.novelreader.tooling.application_workers.ChapterDownloadWorker
 import my.novelreader.tooling.application_workers.LibraryUpdatesWorker
 import my.novelreader.tooling.application_workers.SyncWorker
@@ -24,6 +26,8 @@ class AppWorkerFactory @Inject internal constructor(
     private val syncRepository: SyncRepository,
     private val chapterBodyRepository: ChapterBodyRepository,
     private val bookChaptersRepository: BookChaptersRepository,
+    private val scraper: Scraper,
+    private val mangaImagePrefetcher: MangaImagePrefetcher,
 ) : WorkerFactory() {
     @SuppressLint("LogNotTimber")
     override fun createWorker(
@@ -46,6 +50,8 @@ class AppWorkerFactory @Inject internal constructor(
                 workerParameters = workerParameters,
                 chapterBodyRepository = chapterBodyRepository,
                 bookChaptersRepository = bookChaptersRepository,
+                scraper = scraper,
+                mangaImagePrefetcher = mangaImagePrefetcher,
             )
             SyncWorker::class.java.name -> SyncWorker(
                 context = appContext,

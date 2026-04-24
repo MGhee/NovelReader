@@ -6,6 +6,7 @@ import my.novelreader.core.Response
 import my.novelreader.core.map
 import my.novelreader.network.NetworkClient
 import my.novelreader.network.toDocument
+import my.novelreader.scraper.MangaSourceInterface
 import my.novelreader.scraper.Scraper
 import my.novelreader.scraper.TextExtractor
 import my.novelreader.feature.local_database.tables.Chapter
@@ -154,6 +155,31 @@ class DownloaderRepository @Inject constructor(
                     )
                 }
             }
+    }
+
+    /**
+     * Fetch manga chapter images. Only works for manga sources.
+     */
+    suspend fun mangaChapterImages(
+        chapterUrl: String,
+    ): Response<List<String>> = withContext(Dispatchers.Default) {
+        val error by lazy {
+            """
+				Unable to load chapter images from:
+				$chapterUrl
+
+				Source does not support manga or is not found
+			""".trimIndent()
+        }
+
+        my.novelreader.network.tryFlatConnect {
+            val source = scraper.getCompatibleSource(chapterUrl)
+            if (source is MangaSourceInterface) {
+                source.getChapterImages(chapterUrl)
+            } else {
+                Response.Error(error, Exception("Source is not a manga source"))
+            }
+        }
     }
 }
 

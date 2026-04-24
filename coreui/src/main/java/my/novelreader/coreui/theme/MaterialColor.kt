@@ -166,3 +166,52 @@ val sepia_colorScheme = ColorScheme(
     outlineVariant = SepiaLight200,
     scrim = SepiaLight300,
 )
+
+/**
+ * Build a tinted dark color scheme that uses [accent] as the secondary/surface
+ * tint, sitting on top of three custom background tones [bg900], [bg800], [bg700].
+ *
+ * This is the shared shape for the four "preset" themes (Ocean, Forest, Sunset,
+ * Purple) so the Material colorScheme and the matching AppColor stay in sync.
+ */
+private fun tintedDarkColorScheme(
+    accent: androidx.compose.ui.graphics.Color,
+    bg900: androidx.compose.ui.graphics.Color,
+    bg800: androidx.compose.ui.graphics.Color,
+    bg700: androidx.compose.ui.graphics.Color,
+): ColorScheme = ColorScheme(
+    primary = bg900,
+    onPrimary = Grey25,
+    primaryContainer = bg800,
+    onPrimaryContainer = Grey50,
+    inversePrimary = Grey25,
+    secondary = bg900,
+    onSecondary = Grey25,
+    secondaryContainer = accent,
+    onSecondaryContainer = bg900,
+    tertiary = bg700,
+    onTertiary = accent,
+    tertiaryContainer = bg800,
+    onTertiaryContainer = Grey50,
+    background = bg900,
+    onBackground = Grey50,
+    surface = bg900,
+    onSurface = Grey25,
+    surfaceVariant = bg800,
+    onSurfaceVariant = Grey50,
+    surfaceTint = accent,
+    inverseSurface = Grey25,
+    inverseOnSurface = bg900,
+    error = Error600,
+    onError = Grey25,
+    errorContainer = Error800,
+    onErrorContainer = Grey50,
+    outline = Grey25,
+    outlineVariant = bg700,
+    scrim = bg800,
+)
+
+val ocean_colorScheme = tintedDarkColorScheme(AccentOcean, OceanBg900, OceanBg800, OceanBg700)
+val forest_colorScheme = tintedDarkColorScheme(AccentForest, ForestBg900, ForestBg800, ForestBg700)
+val sunset_colorScheme = tintedDarkColorScheme(AccentSunset, SunsetBg900, SunsetBg800, SunsetBg700)
+val purple_colorScheme = tintedDarkColorScheme(AccentPurple, PurpleBg900, PurpleBg800, PurpleBg700)

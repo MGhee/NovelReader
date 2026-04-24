@@ -19,6 +19,7 @@ import my.novelreader.coreui.theme.ThemeProvider
 import my.novelreader.data.AppRepository
 import my.novelreader.data.DownloaderRepository
 import my.novelreader.data.EpubImporterRepository
+import my.novelreader.data.MangaImagePrefetcher
 import my.novelreader.interactor.WorkersInteractions
 import my.novelreader.chapterslist.R
 import my.novelreader.core.AppCoroutineScope
@@ -30,7 +31,10 @@ import my.novelreader.core.isLocalUri
 import my.novelreader.core.utils.StateExtra_String
 import my.novelreader.core.utils.toState
 import my.novelreader.feature.local_database.ChapterWithContext
+import my.novelreader.feature.local_database.tables.ContentType
+import my.novelreader.scraper.MangaSourceInterface
 import my.novelreader.scraper.Scraper
+import my.novelreader.core.Response
 import javax.inject.Inject
 
 interface ChapterStateBundle {
@@ -42,13 +46,14 @@ interface ChapterStateBundle {
 internal class ChaptersViewModel @Inject constructor(
     private val appRepository: AppRepository,
     private val appScope: AppCoroutineScope,
-    scraper: Scraper,
+    private val scraper: Scraper,
     private val toasty: Toasty,
     private val appPreferences: AppPreferences,
     appFileResolver: AppFileResolver,
     private val downloaderRepository: DownloaderRepository,
     private val chaptersRepository: ChaptersRepository,
     private val epubImporterRepository: EpubImporterRepository,
+    private val mangaImagePrefetcher: MangaImagePrefetcher,
     private val workersInteractions: WorkersInteractions,
     private val bookColorExtractor: BookColorExtractor,
     private val themeProvider: ThemeProvider,
@@ -98,6 +103,10 @@ internal class ChaptersViewModel @Inject constructor(
 
             // Always fetch latest chapters from the source
             updateChaptersList()
+
+            // Always detect and update contentType based on source
+            val contentType = if (source is MangaSourceInterface) ContentType.MANGA else ContentType.NOVEL
+            appRepository.libraryBooks.updateContentType(bookUrl, contentType)
 
             if (appRepository.libraryBooks.get(bookUrl) != null)
                 return@launch
@@ -256,20 +265,22 @@ internal class ChaptersViewModel @Inject constructor(
     fun downloadSelected() {
         if (state.isLocalSource.value) return
 
-        // Get selected chapter URLs
         val selectedUrls = state.selectedChaptersUrl.keys.toSet()
-
-        // Filter and sort chapters by position to ensure sequential download
         val sortedChapters = state.chapters
             .filter { selectedUrls.contains(it.chapter.url) }
             .sortedBy { it.chapter.position }
 
-        // Download chapters sequentially in order
         appScope.launch(Dispatchers.Default) {
             var failed = 0
+            val isManga = scraper.getCompatibleSource(rawBookUrl) is MangaSourceInterface
             sortedChapters.forEach { chapter ->
-                appRepository.chapterBody.fetchBody(chapter.chapter.url)
-                    .onError { failed++ }
+                if (isManga) {
+                    downloadMangaChapterForOffline(chapter.chapter.url)
+                        .onError { failed++ }
+                } else {
+                    appRepository.chapterBody.fetchBody(chapter.chapter.url)
+                        .onError { failed++ }
+                }
             }
             if (failed > 0) {
                 toasty.show("Download failed for $failed chapters")
@@ -333,9 +344,16 @@ internal class ChaptersViewModel @Inject constructor(
     fun onChapterDownload(chapter: ChapterWithContext) {
         if (state.isLocalSource.value) return
         appScope.launch {
-            appRepository.chapterBody.fetchBody(chapter.chapter.url)
-                .onSuccess { toasty.show(R.string.chapter_downloaded) }
-                .onError { toasty.show(R.string.chapter_download_failed) }
+            val isManga = scraper.getCompatibleSource(rawBookUrl) is MangaSourceInterface
+            if (isManga) {
+                downloadMangaChapterForOffline(chapter.chapter.url)
+                    .onSuccess { toasty.show(R.string.chapter_downloaded) }
+                    .onError { toasty.show(R.string.chapter_download_failed) }
+            } else {
+                appRepository.chapterBody.fetchBody(chapter.chapter.url)
+                    .onSuccess { toasty.show(R.string.chapter_downloaded) }
+                    .onError { toasty.show(R.string.chapter_download_failed) }
+            }
         }
     }
 
@@ -356,5 +374,36 @@ internal class ChaptersViewModel @Inject constructor(
         val inverse = (allChaptersUrl - selectedUrl).asSequence().associateWith { }
         state.selectedChaptersUrl.clear()
         state.selectedChaptersUrl.putAll(inverse)
+    }
+
+    fun onChapterBookmarkChange(chapter: ChapterWithContext, bookmarked: Boolean) {
+        appScope.launch {
+            appRepository.bookChapters.setBookmarked(chapter.chapter.url, bookmarked)
+        }
+    }
+
+    private suspend fun downloadMangaChapterForOffline(chapterUrl: String): Response<Unit> {
+        val source = scraper.getCompatibleSource(rawBookUrl)
+        if (source !is MangaSourceInterface) {
+            return Response.Error("Source is not manga", Exception())
+        }
+
+        return try {
+            val response = source.getChapterImages(chapterUrl)
+            if (response !is Response.Success) {
+                val error = (response as? Response.Error)?.exception ?: Exception("Failed to fetch chapter images")
+                return Response.Error(
+                    (response as? Response.Error)?.exception?.message ?: "Failed to fetch chapter images",
+                    error
+                )
+            }
+
+            val imageUrls = response.data
+            mangaImagePrefetcher.prefetchAndAwait(imageUrls)
+            appRepository.chapterBody.saveMangaChapterPages(chapterUrl, imageUrls)
+            Response.Success(Unit)
+        } catch (e: Exception) {
+            Response.Error(e.message ?: "Download failed", e)
+        }
     }
 }

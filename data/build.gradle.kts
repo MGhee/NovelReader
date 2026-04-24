@@ -24,6 +24,7 @@ dependencies {
     implementation(libs.timber)
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)

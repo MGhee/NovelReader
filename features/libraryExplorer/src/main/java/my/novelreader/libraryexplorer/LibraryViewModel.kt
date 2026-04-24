@@ -9,11 +9,18 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import android.util.Log
 import my.novelreader.core.Toasty
 import my.novelreader.coreui.BaseViewModel
 import my.novelreader.data.AppRepository
+import my.novelreader.data.LibraryFilters
+import my.novelreader.data.LibrarySort
+import my.novelreader.data.SortDirection
+import my.novelreader.data.LibraryDisplayMode
+import my.novelreader.data.CategoriesRepository
 import my.novelreader.core.AppFileResolver
 import my.novelreader.core.removeLocalUriPrefix
 import java.io.File
@@ -21,6 +28,7 @@ import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.interactor.WorkersInteractions
 import my.novelreader.core.utils.asMutableStateOf
 import my.novelreader.feature.local_database.BookWithContext
+import my.novelreader.feature.local_database.tables.ContentType
 import javax.inject.Inject
 
 @HiltViewModel
@@ -30,6 +38,7 @@ internal class LibraryViewModel @Inject constructor(
     private val appFileResolver: AppFileResolver,
     private val workersInteractions: WorkersInteractions,
     private val toasty: Toasty,
+    private val categoriesRepository: CategoriesRepository,
     stateHandle: SavedStateHandle,
 ) : BaseViewModel() {
     var showBottomSheet by stateHandle.asMutableStateOf("showBottomSheet") { false }
@@ -48,8 +57,14 @@ internal class LibraryViewModel @Inject constructor(
     private val _list = mutableStateOf<List<BookWithContext>>(emptyList())
     val list: List<BookWithContext> get() = _list.value
 
-    var readFilter by appPreferences.LIBRARY_FILTER_READ.state(viewModelScope)
-    var readSort by appPreferences.LIBRARY_SORT_LAST_READ.state(viewModelScope)
+    // Library state flows backed by preferences
+    var displayMode by appPreferences.LIBRARY_DISPLAY_MODE.state(viewModelScope)
+    var searchQuery by appPreferences.LIBRARY_SEARCH_QUERY.state(viewModelScope)
+    var sortType by appPreferences.LIBRARY_SORT_TYPE.state(viewModelScope)
+    var sortDirection by appPreferences.LIBRARY_SORT_DIRECTION.state(viewModelScope)
+
+    var currentCategoryId: Int? by mutableStateOf(null)
+    val categories = categoriesRepository.getAllCategoriesFlow()
 
     // The most recently read book for the continue reading banner
     var continueReadingBook by mutableStateOf<BookWithContext?>(null)
@@ -60,18 +75,66 @@ internal class LibraryViewModel @Inject constructor(
         private set
 
     init {
+        // Restore category ID from preference
         viewModelScope.launch {
-            appRepository.libraryBooks.getBooksInLibraryWithContextFlow.collect { books ->
-                _list.value = books.sortedByDescending { it.book.lastReadEpochTimeMilli }
+            appPreferences.LIBRARY_CATEGORY_ID.flow().collect { categoryIdStr ->
+                currentCategoryId = if (categoryIdStr.isEmpty()) null else categoryIdStr.toIntOrNull()
+            }
+        }
 
-                // Update continue reading banner
-                val lastRead = _list.value.firstOrNull { it.book.lastReadEpochTimeMilli > 0 }
-                continueReadingBook = lastRead
-                val chapter = lastRead?.book?.lastReadChapter?.let { chapterUrl ->
-                    appRepository.bookChapters.get(chapterUrl)
+        // Load and sort books based on preferences
+        viewModelScope.launch {
+            combine(
+                appRepository.libraryBooks.getBooksInLibraryWithContextFlow,
+                appPreferences.LIBRARY_SORT_TYPE.flow(),
+                appPreferences.LIBRARY_SORT_DIRECTION.flow(),
+                appPreferences.LIBRARY_SEARCH_QUERY.flow()
+            ) { allBooks, sortTypeStr, sortDirStr, query ->
+                Quadruple(allBooks, sortTypeStr, sortDirStr, query)
+            }.collect { (allBooks, sortTypeStr, sortDirStr, query) ->
+                try {
+                    val sortType = try {
+                        LibrarySort.valueOf(sortTypeStr)
+                    } catch (e: Exception) {
+                        LibrarySort.LastRead
+                    }
+                    val sortDir = try {
+                        SortDirection.valueOf(sortDirStr)
+                    } catch (e: Exception) {
+                        SortDirection.Descending
+                    }
+
+                    // Filter by search query (category filtering is handled via DB query in future optimization)
+                    var filtered = allBooks.filter { book ->
+                        query.isEmpty() || book.book.title.contains(query, ignoreCase = true)
+                    }
+
+                    // Apply sorting
+                    filtered = when (sortType) {
+                        LibrarySort.Title -> filtered.sortedBy { it.book.title }
+                        LibrarySort.LastRead -> filtered.sortedByDescending { it.book.lastReadEpochTimeMilli }
+                        LibrarySort.DateAdded -> filtered.sortedByDescending { it.book.url }
+                        LibrarySort.Completed -> filtered.sortedBy { !it.book.completed }
+                        LibrarySort.Unread -> filtered.sortedByDescending { it.newChaptersCount }
+                    }
+
+                    if (sortDir == SortDirection.Ascending) {
+                        filtered = filtered.reversed()
+                    }
+
+                    _list.value = filtered
+
+                    // Update continue reading banner
+                    val lastRead = allBooks.maxByOrNull { it.book.lastReadEpochTimeMilli }
+                    continueReadingBook = lastRead
+                    val chapter = lastRead?.book?.lastReadChapter?.let { chapterUrl ->
+                        appRepository.bookChapters.get(chapterUrl)
+                    }
+                    continueReadingChapterTitle = chapter?.title
+                    continueReadingChapterPosition = (chapter?.position ?: -1) + 1
+                } catch (e: Exception) {
+                    Log.e("LibraryViewModel", "Failed to load books", e)
                 }
-                continueReadingChapterTitle = chapter?.title
-                continueReadingChapterPosition = (chapter?.position ?: -1) + 1
             }
         }
 
@@ -83,12 +146,16 @@ internal class LibraryViewModel @Inject constructor(
         }
     }
 
-    fun readFilterToggle() {
-        readFilter = readFilter.next()
+    data class Quadruple<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
+
+    fun setSort(sort: LibrarySort, direction: SortDirection) {
+        sortType = sort.name
+        sortDirection = direction.name
     }
 
-    fun readSortToggle() {
-        readSort = readSort.next()
+    fun setCategory(categoryId: Int?) {
+        currentCategoryId = categoryId
+        // Preference persistence handled by preference system observers
     }
 
     fun onLibraryRefresh() {

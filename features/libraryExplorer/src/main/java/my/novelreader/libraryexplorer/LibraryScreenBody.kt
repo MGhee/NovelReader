@@ -37,27 +37,47 @@ internal fun LibraryScreenBody(
             .pullRefresh(state = pullRefreshState)
             .padding(innerPadding),
     ) {
-        Column {
-            val continueBook = viewModel.continueReadingBook
-            if (continueBook != null) {
-                ContinueReadingBanner(
-                    book = continueBook,
-                    chapterTitle = viewModel.continueReadingChapterTitle,
-                    chapterPosition = viewModel.continueReadingChapterPosition,
-                    onClick = { onBookClick(continueBook) }
-                )
-            }
-            LibraryPageBody(
-                list = viewModel.list,
-                onClick = onBookClick,
-                onMenuClick = onBookMenuClick,
-                downloadProgress = viewModel.downloadProgress,
-            )
-        }
+        LibraryPageContent(
+            continueBook = viewModel.continueReadingBook,
+            chapterTitle = viewModel.continueReadingChapterTitle,
+            chapterPosition = viewModel.continueReadingChapterPosition,
+            list = viewModel.list,
+            downloadProgress = viewModel.downloadProgress,
+            onBookClick = onBookClick,
+            onBookMenuClick = onBookMenuClick,
+        )
         PullRefreshIndicator(
             refreshing = viewModel.isPullRefreshing,
             state = pullRefreshState,
             modifier = Modifier.align(Alignment.TopCenter),
+        )
+    }
+}
+
+@Composable
+private fun LibraryPageContent(
+    continueBook: BookWithContext?,
+    chapterTitle: String?,
+    chapterPosition: Int,
+    list: List<BookWithContext>,
+    downloadProgress: Map<String, Pair<Int, Int>>,
+    onBookClick: (BookWithContext) -> Unit,
+    onBookMenuClick: (BookWithContext) -> Unit,
+) {
+    Column {
+        if (continueBook != null) {
+            ContinueReadingBanner(
+                book = continueBook,
+                chapterTitle = chapterTitle,
+                chapterPosition = chapterPosition,
+                onClick = { onBookClick(continueBook) }
+            )
+        }
+        LibraryPageBody(
+            list = list,
+            onClick = onBookClick,
+            onMenuClick = onBookMenuClick,
+            downloadProgress = downloadProgress,
         )
     }
 }

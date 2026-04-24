@@ -33,5 +33,7 @@
     <string translatable="false" name="source_name_nobadnovel">NoBadNovel</string>
     <string translatable="false" name="source_name_wtrlab">WtrLab</string>
     <string translatable="false" name="source_name_jaomix">Jaomix</string>
+    <string translatable="false" name="source_mangadex">MangaDex</string>
+    <string translatable="false" name="source_kingofshojo">King of Shojo</string>
 
 </resources>

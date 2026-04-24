@@ -1,5 +1,9 @@
 package my.novelreader.data
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import my.novelreader.core.Response
 import my.novelreader.core.isLocalUri
 import my.novelreader.core.map
@@ -16,6 +20,9 @@ class ChapterBodyRepository @Inject constructor(
     private val bookChaptersRepository: BookChaptersRepository,
     private val downloaderRepository: DownloaderRepository,
 ) {
+    companion object {
+        private const val MANGA_PAGES_PREFIX = "MANGA_PAGES::"
+    }
     suspend fun getAll() = chapterBodyDao.getAll()
     suspend fun insertReplace(chapterBodies: List<ChapterBody>) =
         chapterBodyDao.insertReplace(chapterBodies)
@@ -74,6 +81,9 @@ class ChapterBodyRepository @Inject constructor(
 
     suspend fun getDownloadedCount(bookUrl: String): Int = chapterBodyDao.getDownloadedChapterCount(bookUrl)
 
+    suspend fun mangaChapterImages(chapterUrl: String): Response<List<String>> =
+        downloaderRepository.mangaChapterImages(chapterUrl)
+
     /**
      * Download chapter content without inserting into DB.
      * Returns the ChapterBody and optional title for batch insertion later.
@@ -116,6 +126,23 @@ class ChapterBodyRepository @Inject constructor(
                     bookChaptersRepository.updateTitle(body.url, title)
                 }
             }
+        }
+    }
+
+    suspend fun saveMangaChapterPages(chapterUrl: String, imageUrls: List<String>) {
+        val json = Json.encodeToString(imageUrls)
+        insertReplace(ChapterBody(url = chapterUrl, body = "$MANGA_PAGES_PREFIX$json"))
+    }
+
+    suspend fun getMangaChapterPages(chapterUrl: String): List<String>? {
+        val body = chapterBodyDao.get(chapterUrl) ?: return null
+        if (!body.body.startsWith(MANGA_PAGES_PREFIX)) return null
+        return try {
+            val jsonStr = body.body.substringAfter(MANGA_PAGES_PREFIX)
+            val json = Json.parseToJsonElement(jsonStr)
+            json.jsonArray.map { it.jsonPrimitive.content }
+        } catch (e: Exception) {
+            null
         }
     }
 }

@@ -171,15 +171,14 @@ internal class ReaderItemBinder(
             dimensionRatio = "1:${item.image.yrel}"
         }
 
+        bind.imageContainer.setOnClickListener { onClick() }
+
         val imageModel = appFileResolver.resolvedBookImagePath(bookUrl = bookUrl, imagePath = item.image.path)
-        bind.imageContainer.doOnNextLayout {
-            Glide.with(ctx)
-                .load(imageModel)
-                .fitCenter()
-                .error(R.drawable.ic_baseline_error_outline_24)
-                .transition(DrawableTransitionOptions.withCrossFade())
-                .into(bind.image)
-        }
+        Glide.with(ctx)
+            .load(imageModel)
+            .fitCenter()
+            .error(R.drawable.ic_baseline_error_outline_24)
+            .into(bind.image)
 
         when (item.location) {
             ReaderItem.Location.FIRST -> onChapterStartVisible(item.chapterUrl)

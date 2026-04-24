@@ -34,7 +34,8 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.viewpager2)
     implementation(libs.compose.material3.android)
-    
+    implementation(libs.compose.coil)
+
     // Kotlin reflection for dynamic batch translator lookup
     implementation(kotlin("reflect"))
 

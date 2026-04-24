@@ -5,6 +5,10 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
 
+enum class ContentType {
+    NOVEL, MANGA
+}
+
 @Parcelize
 @Entity
 data class Book(
@@ -18,4 +22,5 @@ data class Book(
     val lastReadEpochTimeMilli: Long = 0,
     val lastSeenChaptersCount: Int = 0,
     val coverSeedColor: Int? = null,
+    val contentType: ContentType = ContentType.NOVEL,
 ) : Parcelable
