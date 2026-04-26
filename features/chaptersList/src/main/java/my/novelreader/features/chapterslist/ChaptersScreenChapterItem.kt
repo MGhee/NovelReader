@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Bookmark
@@ -19,6 +20,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -69,19 +71,21 @@ internal fun ChaptersScreenChapterItem(
         },
         trailingContent = if (isLocalSource) null else {
             {
-                IconButton(onClick = { onBookmarkChange(!chapter.bookmarked) }) {
-                    Icon(
-                        if (chapter.bookmarked) Icons.Filled.Bookmark
-                        else Icons.Outlined.BookmarkBorder,
-                        null
-                    )
-                }
-                IconButton(onClick = onDownload) {
-                    Icon(
-                        if (chapterWithContext.downloaded) Icons.Filled.CloudDownload
-                        else Icons.Outlined.CloudDownload,
-                        null
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { onBookmarkChange(!chapter.bookmarked) }) {
+                        Icon(
+                            if (chapter.bookmarked) Icons.Filled.Bookmark
+                            else Icons.Outlined.BookmarkBorder,
+                            null
+                        )
+                    }
+                    IconButton(onClick = onDownload) {
+                        Icon(
+                            if (chapterWithContext.downloaded) Icons.Filled.CloudDownload
+                            else Icons.Outlined.CloudDownload,
+                            null
+                        )
+                    }
                 }
             }
         },

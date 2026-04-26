@@ -18,6 +18,7 @@ import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.core.utils.StateExtra_String
 import my.novelreader.core.utils.asMutableStateOf
 import my.novelreader.feature.local_database.BookMetadata
+import my.novelreader.interactor.WorkersInteractions
 import my.novelreader.scraper.Scraper
 import javax.inject.Inject
 
@@ -29,6 +30,7 @@ interface SourceCatalogStateBundle {
 @HiltViewModel
 internal class SourceCatalogViewModel @Inject constructor(
     private val appRepository: AppRepository,
+    private val workersInteractions: WorkersInteractions,
     private val toasty: Toasty,
     stateHandle: SavedStateHandle,
     appPreferences: AppPreferences,
@@ -85,6 +87,9 @@ internal class SourceCatalogViewModel @Inject constructor(
         {
             val isInLibrary =
                 appRepository.toggleBookmark(bookUrl = book.url, bookTitle = book.title)
+            if (!isInLibrary) {
+                workersInteractions.cancelDownload(book.url)
+            }
             val res = if (isInLibrary) R.string.added_to_library else R.string.removed_from_library
             toasty.show(res)
         }

@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -48,9 +52,12 @@ internal fun ChaptersScreenHeader(
     bookState: ChaptersScreenState.BookState,
     sourceCatalogName: String,
     numberOfChapters: Int,
+    chapterSourceOptions: List<String>,
+    selectedChapterSource: String?,
     paddingValues: PaddingValues,
     modifier: Modifier = Modifier,
     onCoverLongClick: () -> Unit,
+    onChapterSourceSelected: (String?) -> Unit,
     onGlobalSearchClick: (input: String) -> Unit,
 ) {
     val coverImageModel = bookState.coverImageUrl?.let {
@@ -153,6 +160,53 @@ internal fun ChaptersScreenHeader(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onTertiary,
                         )
+                    }
+                    if (chapterSourceOptions.size > 1) {
+                        var showChapterSourceMenu by rememberSaveable { mutableStateOf(false) }
+                        Box {
+                            OutlinedButton(
+                                onClick = { showChapterSourceMenu = true },
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ),
+                            ) {
+                                Text(
+                                    selectedChapterSource ?: "All sources",
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showChapterSourceMenu,
+                                onDismissRequest = { showChapterSourceMenu = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "All sources",
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                    },
+                                    onClick = {
+                                        showChapterSourceMenu = false
+                                        onChapterSourceSelected(null)
+                                    }
+                                )
+                                chapterSourceOptions.forEach { source ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                source,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                            )
+                                        },
+                                        onClick = {
+                                            showChapterSourceMenu = false
+                                            onChapterSourceSelected(source)
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

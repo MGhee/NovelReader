@@ -296,6 +296,16 @@ class AppPreferences @Inject constructor(
     val MANGA_SOURCE_READING_MODES = object : Preference<String>("MANGA_SOURCE_READING_MODES") {
         override var value by SharedPreference_String(name, preferences, "{}")
     }
+    val MANGA_BOOK_PREFERRED_SOURCES =
+        object : Preference<Map<String, String>>("MANGA_BOOK_PREFERRED_SOURCES") {
+            override var value by SharedPreference_Serializable<Map<String, String>>(
+                name = name,
+                sharedPreferences = preferences,
+                defaultValue = emptyMap(),
+                encode = { Json.encodeToString(it) },
+                decode = { Json.decodeFromString<Map<String, String>>(it) }
+            )
+        }
     val MANGA_ORIENTATION = object : Preference<String>("MANGA_ORIENTATION") {
         override var value by SharedPreference_String(name, preferences, "Free")
     }
@@ -377,6 +387,19 @@ class AppPreferences @Inject constructor(
                 preferencesChangeListeners.remove(listener)
                 preferences.unregisterOnSharedPreferenceChangeListener(listener)
             }.flowOn(Dispatchers.Default)
+    }
+
+    fun getPreferredMangaSource(bookUrl: String): String? =
+        MANGA_BOOK_PREFERRED_SOURCES.value[bookUrl]
+
+    fun setPreferredMangaSource(bookUrl: String, source: String?) {
+        val updated = MANGA_BOOK_PREFERRED_SOURCES.value.toMutableMap()
+        if (source.isNullOrBlank()) {
+            updated.remove(bookUrl)
+        } else {
+            updated[bookUrl] = source
+        }
+        MANGA_BOOK_PREFERRED_SOURCES.value = updated
     }
 
     /**

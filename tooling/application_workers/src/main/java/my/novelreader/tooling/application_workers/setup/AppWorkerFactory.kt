@@ -6,11 +6,13 @@ import android.util.Log
 import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
+import my.novelreader.core.appPreferences.AppPreferences
 import my.novelreader.coreui.states.NotificationsCenter
 import my.novelreader.data.AppRemoteRepository
 import my.novelreader.data.SyncRepository
 import my.novelreader.data.BookChaptersRepository
 import my.novelreader.data.ChapterBodyRepository
+import my.novelreader.data.LibraryBooksRepository
 import my.novelreader.data.MangaImagePrefetcher
 import my.novelreader.scraper.Scraper
 import my.novelreader.tooling.application_workers.ChapterDownloadWorker
@@ -26,6 +28,8 @@ class AppWorkerFactory @Inject internal constructor(
     private val syncRepository: SyncRepository,
     private val chapterBodyRepository: ChapterBodyRepository,
     private val bookChaptersRepository: BookChaptersRepository,
+    private val libraryBooksRepository: LibraryBooksRepository,
+    private val appPreferences: AppPreferences,
     private val scraper: Scraper,
     private val mangaImagePrefetcher: MangaImagePrefetcher,
 ) : WorkerFactory() {
@@ -50,6 +54,8 @@ class AppWorkerFactory @Inject internal constructor(
                 workerParameters = workerParameters,
                 chapterBodyRepository = chapterBodyRepository,
                 bookChaptersRepository = bookChaptersRepository,
+                libraryBooksRepository = libraryBooksRepository,
+                appPreferences = appPreferences,
                 scraper = scraper,
                 mangaImagePrefetcher = mangaImagePrefetcher,
             )

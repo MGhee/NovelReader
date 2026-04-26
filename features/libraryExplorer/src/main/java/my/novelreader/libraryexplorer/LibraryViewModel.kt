@@ -33,7 +33,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 internal class LibraryViewModel @Inject constructor(
-    appPreferences: AppPreferences,
+    private val appPreferences: AppPreferences,
     private val appRepository: AppRepository,
     private val appFileResolver: AppFileResolver,
     private val workersInteractions: WorkersInteractions,
@@ -41,6 +41,10 @@ internal class LibraryViewModel @Inject constructor(
     private val categoriesRepository: CategoriesRepository,
     stateHandle: SavedStateHandle,
 ) : BaseViewModel() {
+    private companion object {
+        const val CHAPTER_SOURCE_DELIMITER = " — "
+    }
+
     var showBottomSheet by stateHandle.asMutableStateOf("showBottomSheet") { false }
     var bookOptionsSheetBook by stateHandle.asMutableStateOf<BookWithContext?>(
         key = "bookOptionsSheetBook",
@@ -182,10 +186,15 @@ internal class LibraryViewModel @Inject constructor(
 
     suspend fun getBookOpenChapterUrl(bookUrl: String): String? {
         val book = appRepository.libraryBooks.get(bookUrl) ?: return null
+        val preferredSource = getPreferredMangaSource(bookUrl, book.contentType)
+        val chapters = appRepository.bookChapters.chapters(bookUrl).sortedBy { it.position }
+        val filteredChapters = preferredSource?.let { selectedSource ->
+            chapters.filter { extractChapterSource(it.title) == selectedSource }
+        } ?: chapters
         val lastReadChapterUrl = book.lastReadChapter
 
         if (lastReadChapterUrl != null) {
-            val hasLastReadChapter = appRepository.bookChapters.get(lastReadChapterUrl) != null
+            val hasLastReadChapter = filteredChapters.any { it.url == lastReadChapterUrl }
             if (hasLastReadChapter) {
                 return lastReadChapterUrl
             }
@@ -193,7 +202,7 @@ internal class LibraryViewModel @Inject constructor(
             toasty.show(R.string.last_read_chapter_not_found_opening_first)
         }
 
-        val firstChapterUrl = appRepository.bookChapters.getFirstChapter(bookUrl)?.url
+        val firstChapterUrl = filteredChapters.firstOrNull()?.url
         if (firstChapterUrl == null) {
             toasty.show(R.string.unable_to_open_book_no_chapters_found)
             return null
@@ -201,6 +210,35 @@ internal class LibraryViewModel @Inject constructor(
 
         return firstChapterUrl
     }
+
+    suspend fun getPreferredMangaSource(bookUrl: String, contentType: ContentType? = null): String? {
+        if (contentType != null && contentType != ContentType.MANGA) return null
+
+        val savedSource = appPreferences.getPreferredMangaSource(bookUrl)
+        if (!savedSource.isNullOrBlank()) {
+            return savedSource
+        }
+
+        val chapters = appRepository.bookChapters.chapters(bookUrl)
+        val sources = chapters
+            .asSequence()
+            .mapNotNull { extractChapterSource(it.title) }
+            .groupingBy { it }
+            .eachCount()
+
+        return sources.entries
+            .sortedWith(
+                compareByDescending<Map.Entry<String, Int>> { it.value }
+                    .thenBy { it.key.lowercase() }
+            )
+            .firstOrNull()
+            ?.key
+    }
+
+    private fun extractChapterSource(title: String): String? =
+        title.substringAfterLast(CHAPTER_SOURCE_DELIMITER, "")
+            .trim()
+            .takeIf { it.isNotBlank() }
 
     fun downloadAllBookChapters(bookUrl: String) {
         viewModelScope.launch {
@@ -276,6 +314,8 @@ internal class LibraryViewModel @Inject constructor(
 
     fun removeBook(bookUrl: String) {
         viewModelScope.launch {
+            workersInteractions.cancelDownload(bookUrl)
+
             val chapters = appRepository.bookChapters.chapters(bookUrl).map { it.url }
             if (chapters.isNotEmpty()) {
                 appRepository.chapterBody.removeRows(chapters)

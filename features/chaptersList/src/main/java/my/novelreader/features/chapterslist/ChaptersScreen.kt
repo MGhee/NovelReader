@@ -97,6 +97,7 @@ internal fun ChaptersScreen(
     onCoverLongClick: () -> Unit,
     onChangeCover: () -> Unit,
     onOpenInBrowser: (url: String) -> Unit,
+    onChapterSourceSelected: (String?) -> Unit,
     onGlobalSearchClick: (input: String) -> Unit,
 ) {
     var showDropDown by rememberSaveable { mutableStateOf(false) }
@@ -254,6 +255,7 @@ internal fun ChaptersScreen(
                 onChapterBookmarkChange = onChapterBookmarkChange,
                 onPullRefresh = onPullRefresh,
                 onCoverLongClick = onCoverLongClick,
+                onChapterSourceSelected = onChapterSourceSelected,
                 onGlobalSearchClick = onGlobalSearchClick,
             )
             Box(Modifier.padding(innerPadding)) {

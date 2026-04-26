@@ -4,13 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.view.WindowManager
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,7 +23,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -56,7 +50,6 @@ fun MangaReaderRoot(
     val errorMessage by viewModel.errorMessage
     val showMenus by viewModel.showMenus
     val viewerChapters by viewModel.viewerChapters.collectAsState()
-    val currentPageIndex by viewModel.currentPageIndex.collectAsState()
     val readingMode by viewModel.readingMode.collectAsState()
     val bgColor by viewModel.backgroundColor.collectAsState()
     val keepScreenOn by viewModel.readerPrefs.keepScreenOn.collectAsState()
@@ -65,7 +58,6 @@ fun MangaReaderRoot(
     val colorFilter by viewModel.readerPrefs.colorFilter.collectAsState()
     val colorFilterAlpha by viewModel.readerPrefs.colorFilterAlpha.collectAsState()
     val colorFilterValue by viewModel.readerPrefs.colorFilterValue.collectAsState()
-    val showTransitionCard by viewModel.readerPrefs.showTransitionCard.collectAsState()
     val context = LocalContext.current
     val activity = context as? Activity
 
@@ -264,47 +256,6 @@ fun MangaReaderRoot(
                 viewModel = viewModel,
                 onDismiss = { viewModel.showPageActionsSheet.value = false }
             )
-        }
-
-        // Chapter transition card (at end of chapter)
-        if (showTransitionCard && viewerChapters != null) {
-            val chapter = viewerChapters!!.currentChapter
-            val isLastPage = currentPageIndex == (chapter.pages.size - 1)
-            if (isLastPage) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.7f))
-                        .clickable(enabled = false) {},
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(32.dp)
-                            .background(Color.Gray.copy(alpha = 0.9f))
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "Chapter complete!",
-                            color = Color.White,
-                            fontSize = androidx.compose.material3.MaterialTheme.typography.headlineSmall.fontSize,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                        Text(
-                            chapter.title,
-                            color = Color.White,
-                            modifier = Modifier.padding(bottom = 24.dp)
-                        )
-                        Button(
-                            onClick = { viewModel.loadNextChapter() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Blue)
-                        ) {
-                            Text("Next Chapter")
-                        }
-                    }
-                }
-            }
         }
     }
 }

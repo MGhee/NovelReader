@@ -15,7 +15,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
@@ -43,10 +45,23 @@ fun CatalogExplorerScreen(
 ) {
     val viewModel: CatalogExplorerViewModel = viewModel()
 
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.clearSearch()
+        }
+    }
+
     val context by rememberUpdatedState(newValue = LocalContext.current)
     var languagesOptionsExpanded by rememberSaveable { mutableStateOf(false) }
     var toolbarMode by rememberSaveable { mutableStateOf(ToolbarMode.MAIN) }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+
+    LaunchedEffect(viewModel.searchMode) {
+        if (!viewModel.searchMode && toolbarMode != ToolbarMode.MAIN) {
+            toolbarMode = ToolbarMode.MAIN
+        }
+    }
+
     val focusRequester = FocusRequester()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         snapAnimationSpec = null,
@@ -122,9 +137,7 @@ fun CatalogExplorerScreen(
                                 onTextDone = { },
                                 onClose = {
                                     toolbarMode = ToolbarMode.MAIN
-                                    viewModel.searchMode = false
-                                    viewModel.searchTextInput = ""
-                                    viewModel.searchResults.clear()
+                                    viewModel.clearSearch()
                                 },
                                 placeholderText = stringResource(R.string.search_by_title),
                                 scrollBehavior = scrollBehavior,

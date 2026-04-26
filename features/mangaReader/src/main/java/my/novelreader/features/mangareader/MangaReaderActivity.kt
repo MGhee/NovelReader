@@ -23,15 +23,18 @@ class MangaReaderActivity : BaseActivity() {
     class IntentData : Intent, MangaReaderStateBundle {
         override var bookUrl by Extra_String()
         override var chapterUrl by Extra_String()
+        override var chapterSource by Extra_String()
 
         constructor(intent: Intent) : super(intent)
         constructor(
             ctx: Context,
             bookUrl: String,
             chapterUrl: String,
+            chapterSource: String? = null,
         ) : super(ctx, MangaReaderActivity::class.java) {
             this.bookUrl = bookUrl
             this.chapterUrl = chapterUrl
+            this.chapterSource = chapterSource.orEmpty()
         }
     }
 

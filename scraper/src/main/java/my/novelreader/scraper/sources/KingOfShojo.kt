@@ -15,7 +15,9 @@ import my.novelreader.scraper.MangaSourceInterface
 import my.novelreader.scraper.domain.BookResult
 import my.novelreader.scraper.domain.ChapterResult
 import my.novelreader.strings.R
+import org.jsoup.nodes.Document
 import org.jsoup.Jsoup
+import java.net.URI
 import java.net.URLEncoder
 
 /**
@@ -46,11 +48,7 @@ class KingOfShojo(
                 val body = networkClient.get(bookUrl).bodyString()
                 val doc = Jsoup.parse(body)
 
-                // Try to find cover image in various possible locations
-                doc.selectFirst("img[class*=series-cover]")?.attr("src")
-                    ?: doc.selectFirst("img[alt*=cover]")?.attr("src")
-                    ?: doc.selectFirst(".post-image img")?.attr("src")
-                    ?: doc.selectFirst("img[src*=wp-content/uploads]")?.attr("src")
+                extractCoverImageUrl(doc, bookUrl)
             }
         }
 
@@ -66,6 +64,55 @@ class KingOfShojo(
                     ?: doc.selectFirst("[class*=synopsis]")?.text()
             }
         }
+
+    private fun extractCoverImageUrl(doc: Document, bookUrl: String): String? {
+        val title = doc.selectFirst("article h1, h1")?.text()?.trim().orEmpty()
+
+        val candidates = buildList {
+            add(doc.selectFirst("a[href*=pinterest.com][href*='media=']")
+                ?.attr("href")
+                ?.substringAfter("media=", "")
+                ?.substringBefore("&")
+                ?.takeIf { it.isNotBlank() }
+                ?.let(java.net.URLDecoder::decode))
+
+            add(doc.selectFirst("article img.wp-post-image[alt]")?.bestImageAttr())
+            add(doc.select("article img[alt]").firstOrNull { it.attr("alt").trim() == title }?.bestImageAttr())
+            add(doc.selectFirst("article .post-image img")?.bestImageAttr())
+            add(doc.selectFirst("meta[property=og:image]")?.attr("content"))
+            add(doc.selectFirst("meta[name=twitter:image]")?.attr("content"))
+            add(doc.selectFirst("img[src*=cdn.kingofshojo.com/king-bucket/images]")?.bestImageAttr())
+            add(doc.selectFirst("img[src*=cdn.kingofshojo.com]")?.bestImageAttr())
+            add(doc.selectFirst("img[class*=series-cover]")?.bestImageAttr())
+            add(doc.selectFirst("img[alt*=cover]")?.bestImageAttr())
+            add(doc.selectFirst("img[src*=wp-content/uploads]")?.bestImageAttr())
+        }
+
+        return candidates
+            .asSequence()
+            .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
+            .map { normalizeUrl(it, bookUrl) }
+            .firstOrNull(::isLikelyCoverImage)
+    }
+
+    private fun org.jsoup.nodes.Element.bestImageAttr(): String? =
+        attr("data-src").takeIf { it.isNotBlank() }
+            ?: attr("data-lazy-src").takeIf { it.isNotBlank() }
+            ?: attr("src").takeIf { it.isNotBlank() }
+
+    private fun normalizeUrl(url: String, base: String): String = runCatching {
+        if (url.startsWith("http://") || url.startsWith("https://")) url
+        else URI(base).resolve(url).toString()
+    }.getOrDefault(url)
+
+    private fun isLikelyCoverImage(url: String): Boolean {
+        val lower = url.lowercase()
+        if (lower.contains("wewtwt.png")) return false
+        if (lower.contains("kingofshojo.com/wp-content/uploads/2024/03/wewtwt.png")) return false
+        if (lower.contains("pubfuture") || lower.contains("gravatar") || lower.contains("bobapsoabauns.com")) return false
+        if (lower.contains("ic-close-circle") || lower.contains("emoji/") || lower.contains("s3.pubfuture.com")) return false
+        return lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp")
+    }
 
     override suspend fun getChapterList(bookUrl: String): Response<List<ChapterResult>> =
         withContext(Dispatchers.Default) {

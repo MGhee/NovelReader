@@ -40,6 +40,7 @@ internal fun ChaptersScreenBody(
     onChapterBookmarkChange: (chapter: ChapterWithContext, bookmarked: Boolean) -> Unit = { _, _ -> },
     onPullRefresh: () -> Unit,
     onCoverLongClick: () -> Unit,
+    onChapterSourceSelected: (String?) -> Unit,
     onGlobalSearchClick: (input: String) -> Unit,
 ) {
     var isRefreshingDelayed by remember { mutableStateOf(state.isRefreshing.value) }
@@ -74,9 +75,12 @@ internal fun ChaptersScreenBody(
                         id = state.sourceCatalogNameStrRes.value ?: R.string.invalid_source
                     ),
                     numberOfChapters = state.chapters.size,
+                    chapterSourceOptions = state.chapterSourceOptions,
+                    selectedChapterSource = state.selectedChapterSource.value,
                     paddingValues = innerPadding,
                     modifier = Modifier.padding(bottom = 12.dp),
                     onCoverLongClick = onCoverLongClick,
+                    onChapterSourceSelected = onChapterSourceSelected,
                     onGlobalSearchClick = onGlobalSearchClick,
                 )
             }

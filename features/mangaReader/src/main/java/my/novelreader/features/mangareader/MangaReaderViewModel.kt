@@ -41,6 +41,7 @@ import javax.inject.Inject
 interface MangaReaderStateBundle {
     var bookUrl: String
     var chapterUrl: String
+    var chapterSource: String
 }
 
 @HiltViewModel
@@ -56,6 +57,11 @@ class MangaReaderViewModel @Inject constructor(
 
     override var bookUrl by StateExtra_String(stateHandler)
     override var chapterUrl by StateExtra_String(stateHandler)
+    override var chapterSource by StateExtra_String(stateHandler)
+
+    private companion object {
+        const val CHAPTER_SOURCE_DELIMITER = " — "
+    }
 
     // UI state
     val showMenus = mutableStateOf(false)
@@ -153,6 +159,11 @@ class MangaReaderViewModel @Inject constructor(
                 // Get all chapters for this book
                 val chapters = appRepository.bookChapters.chapters(bookUrl)
                     .sortedBy { it.position }
+                    .let { all ->
+                        chapterSource.takeIf { it.isNotBlank() }?.let { selectedSource ->
+                            all.filter { extractChapterSource(it.title) == selectedSource }
+                        } ?: all
+                    }
                 val chapterInfos = chapters.map { ChapterInfo(it.url, it.title, it.position) }
                 _chapterList.value = chapters
 
@@ -178,8 +189,7 @@ class MangaReaderViewModel @Inject constructor(
                     _currentChapter.value = chapter
                     errorMessage.value = null
 
-                    // Persist as last read chapter
-                    appRepository.libraryBooks.updateLastReadChapter(bookUrl, chapterUrl)
+                    updateLastReadState(chapterUrl)
 
                     // Restore last read page
                     val lastReadPage = chapters.find { it.url == chapterUrl }?.lastReadMangaPage ?: 0
@@ -239,6 +249,7 @@ class MangaReaderViewModel @Inject constructor(
         this.chapterUrl = chapterUrl
         viewModelScope.launch {
             isLoading.value = true
+            errorMessage.value = null
             try {
                 // Mark previous chapter as read
                 currentChapter.value?.url?.let {
@@ -253,8 +264,7 @@ class MangaReaderViewModel @Inject constructor(
                     _currentPageIndex.value = 0
                     initialPageIndex = 0
 
-                    // Persist as last read chapter
-                    appRepository.libraryBooks.updateLastReadChapter(bookUrl, chapterUrl)
+                    updateLastReadState(chapterUrl)
 
                     // Prefetch all chapter images - wait until cached before showing viewer
                     chapter?.let {
@@ -270,6 +280,9 @@ class MangaReaderViewModel @Inject constructor(
                         currentChapter = chapter!!,
                         nextChapter = null
                     )
+                } else {
+                    errorMessage.value = loadResult.exceptionOrNull()?.message
+                        ?: "Unable to load this chapter. If you are offline, download it first."
                 }
             } finally {
                 isLoading.value = false
@@ -336,5 +349,18 @@ class MangaReaderViewModel @Inject constructor(
         } catch (e: Exception) {
             // Silently ignore save errors
         }
+    }
+
+    private fun extractChapterSource(title: String): String? =
+        title.substringAfterLast(CHAPTER_SOURCE_DELIMITER, "")
+            .trim()
+            .takeIf { it.isNotBlank() }
+
+    private suspend fun updateLastReadState(chapterUrl: String) {
+        appRepository.libraryBooks.updateLastReadChapter(bookUrl, chapterUrl)
+        appRepository.libraryBooks.updateLastReadEpochTimeMilli(
+            bookUrl,
+            System.currentTimeMillis()
+        )
     }
 }

@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -22,13 +23,17 @@ class MangaImagePrefetcher @Inject constructor(
     @ApplicationContext context: Context,
     private val client: OkHttpClient,
 ) {
+    private companion object {
+        const val MAX_CONCURRENT_IMAGE_DOWNLOADS = 8
+    }
+
     private val cacheDir = File(context.cacheDir, "manga_pages_cache").apply { mkdirs() }
     private var prefetchJob: kotlinx.coroutines.Job? = null
 
     fun prefetch(imageUrls: List<String>, scope: CoroutineScope) {
         prefetchJob?.cancel()
         prefetchJob = scope.launch(Dispatchers.IO) {
-            val semaphore = Semaphore(4)
+            val semaphore = Semaphore(MAX_CONCURRENT_IMAGE_DOWNLOADS)
             imageUrls.map { url ->
                 async {
                     semaphore.withPermit {
@@ -41,7 +46,7 @@ class MangaImagePrefetcher @Inject constructor(
 
     suspend fun prefetchAndAwait(imageUrls: List<String>): Boolean =
         withContext(Dispatchers.IO) {
-            val semaphore = Semaphore(4)
+            val semaphore = Semaphore(MAX_CONCURRENT_IMAGE_DOWNLOADS)
             imageUrls.map { url ->
                 async {
                     semaphore.withPermit {
@@ -56,7 +61,7 @@ class MangaImagePrefetcher @Inject constructor(
         prefetchJob = null
     }
 
-    private fun downloadIfMissing(imageUrl: String): Boolean {
+    private suspend fun downloadIfMissing(imageUrl: String): Boolean {
         val extension = imageUrl.fileExtensionOrDefault()
         val cachedFile = File(cacheDir, "${imageUrl.sha256()}.$extension")
 
@@ -102,7 +107,7 @@ class MangaImagePrefetcher @Inject constructor(
             }.getOrDefault(false)
 
             if (ok) return true
-            if (attempt < 2) Thread.sleep(300L * (attempt + 1))
+            if (attempt < 2) delay(300L * (attempt + 1))
         }
         return false
     }

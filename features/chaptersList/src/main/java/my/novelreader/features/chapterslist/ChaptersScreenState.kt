@@ -14,9 +14,11 @@ internal data class ChaptersScreenState(
     val error: MutableState<String>,
     val selectedChaptersUrl: SnapshotStateMap<String, Unit>,
     val chapters: SnapshotStateList<ChapterWithContext>,
+    val chapterSourceOptions: SnapshotStateList<String>,
     val isRefreshing: MutableState<Boolean>,
     val sourceCatalogNameStrRes: State<Int?>,
     val settingChapterSort: MutableState<TernaryState>,
+    val selectedChapterSource: MutableState<String?>,
     val isLocalSource: State<Boolean>,
     val isRefreshable: State<Boolean>,
 ) {

@@ -116,6 +116,13 @@ internal class CatalogExplorerViewModel @Inject constructor(
         }
     }
 
+    fun clearSearch() {
+        searchJob?.cancel()
+        searchMode = false
+        searchTextInput = ""
+        searchResults.clear()
+    }
+
     private suspend fun performLiveSearch(query: String) {
         val activeSources = sourcesList
         searchResults.clear()

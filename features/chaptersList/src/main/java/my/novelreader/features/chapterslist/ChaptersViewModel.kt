@@ -9,9 +9,14 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import my.novelreader.coreui.BaseViewModel
 import my.novelreader.coreui.theme.BookColorExtractor
@@ -60,6 +65,11 @@ internal class ChaptersViewModel @Inject constructor(
     stateHandle: SavedStateHandle,
 ) : BaseViewModel(), ChapterStateBundle {
 
+    private companion object {
+        const val CHAPTER_SOURCE_DELIMITER = " — "
+        const val MAX_CONCURRENT_MANGA_CHAPTER_DOWNLOADS = 3
+    }
+
     override val rawBookUrl by StateExtra_String(stateHandle)
     override val bookTitle by StateExtra_String(stateHandle)
 
@@ -70,6 +80,8 @@ internal class ChaptersViewModel @Inject constructor(
 
     @Volatile
     private var lastSelectedChapterUrl: String? = null
+    private var allChapters: List<ChapterWithContext> = emptyList()
+    private var hasUserSelectedChapterSource = false
     private val source = scraper.getCompatibleSource(bookUrl)
     private val book = appRepository.libraryBooks.getFlow(bookUrl)
         .filterNotNull()
@@ -83,10 +95,12 @@ internal class ChaptersViewModel @Inject constructor(
         book = book,
         error = mutableStateOf(""),
         chapters = mutableStateListOf(),
+        chapterSourceOptions = mutableStateListOf(),
         selectedChaptersUrl = mutableStateMapOf(),
         isRefreshing = mutableStateOf(false),
         sourceCatalogNameStrRes = mutableStateOf(source?.nameStrId),
         settingChapterSort = appPreferences.CHAPTERS_SORT_ASCENDING.state(viewModelScope),
+        selectedChapterSource = mutableStateOf(null),
         isLocalSource = mutableStateOf(bookUrl.isLocalUri),
         isRefreshable = mutableStateOf(rawBookUrl.isContentUri || !bookUrl.isLocalUri)
     )
@@ -116,8 +130,9 @@ internal class ChaptersViewModel @Inject constructor(
 
         viewModelScope.launch {
             chaptersRepository.getChaptersSortedFlow(bookUrl = bookUrl).collect {
-                state.chapters.clear()
-                state.chapters.addAll(it)
+                allChapters = it
+                syncChapterSourceOptions(it)
+                applyChapterSourceFilter()
             }
         }
 
@@ -140,6 +155,9 @@ internal class ChaptersViewModel @Inject constructor(
         viewModelScope.launch {
             val isBookmarked =
                 appRepository.toggleBookmark(bookTitle = bookTitle, bookUrl = bookUrl)
+            if (!isBookmarked) {
+                workersInteractions.cancelDownload(this@ChaptersViewModel.bookUrl)
+            }
             val msg = if (isBookmarked) R.string.added_to_library else R.string.removed_from_library
             toasty.show(msg)
         }
@@ -273,11 +291,19 @@ internal class ChaptersViewModel @Inject constructor(
         appScope.launch(Dispatchers.Default) {
             var failed = 0
             val isManga = scraper.getCompatibleSource(rawBookUrl) is MangaSourceInterface
-            sortedChapters.forEach { chapter ->
-                if (isManga) {
-                    downloadMangaChapterForOffline(chapter.chapter.url)
-                        .onError { failed++ }
-                } else {
+            if (isManga) {
+                val semaphore = Semaphore(MAX_CONCURRENT_MANGA_CHAPTER_DOWNLOADS)
+                failed = coroutineScope {
+                    sortedChapters.map { chapter ->
+                        async {
+                            semaphore.withPermit {
+                                downloadMangaChapterForOffline(chapter.chapter.url)
+                            }
+                        }
+                    }.awaitAll().count { it is Response.Error }
+                }
+            } else {
+                sortedChapters.forEach { chapter ->
                     appRepository.chapterBody.fetchBody(chapter.chapter.url)
                         .onError { failed++ }
                 }
@@ -381,6 +407,73 @@ internal class ChaptersViewModel @Inject constructor(
             appRepository.bookChapters.setBookmarked(chapter.chapter.url, bookmarked)
         }
     }
+
+    fun onChapterSourceSelected(source: String?) {
+        hasUserSelectedChapterSource = true
+        updateSelectedChapterSource(source)
+    }
+
+    private fun syncChapterSourceOptions(chapters: List<ChapterWithContext>) {
+        val sourceCounts = chapters
+            .asSequence()
+            .mapNotNull { extractChapterSource(it.chapter.title) }
+            .groupingBy { it }
+            .eachCount()
+
+        val options = sourceCounts
+            .keys
+            .asSequence()
+            .sortedBy { it.lowercase() }
+            .toList()
+
+        val defaultSource = sourceCounts
+            .entries
+            .sortedWith(
+                compareByDescending<Map.Entry<String, Int>> { it.value }
+                    .thenBy { it.key.lowercase() }
+            )
+            .firstOrNull()
+            ?.key
+
+        state.chapterSourceOptions.clear()
+        state.chapterSourceOptions.addAll(options)
+
+        val selectedSource = state.selectedChapterSource.value
+        when {
+            selectedSource != null && selectedSource !in options -> {
+                hasUserSelectedChapterSource = false
+                updateSelectedChapterSource(defaultSource)
+            }
+
+            !hasUserSelectedChapterSource -> updateSelectedChapterSource(defaultSource)
+        }
+    }
+
+    private fun updateSelectedChapterSource(source: String?) {
+        appPreferences.setPreferredMangaSource(bookUrl, source)
+        if (state.selectedChapterSource.value == source) return
+        state.selectedChapterSource.value = source
+        state.selectedChaptersUrl.clear()
+        lastSelectedChapterUrl = null
+        applyChapterSourceFilter()
+    }
+
+    private fun applyChapterSourceFilter() {
+        val selectedSource = state.selectedChapterSource.value
+        val filtered = if (selectedSource == null) {
+            allChapters
+        } else {
+            allChapters.filter { extractChapterSource(it.chapter.title) == selectedSource }
+        }
+
+        state.chapters.clear()
+        state.chapters.addAll(filtered)
+    }
+
+    private fun extractChapterSource(title: String): String? =
+        title.substringAfterLast(CHAPTER_SOURCE_DELIMITER, "")
+            .trim()
+            .takeIf { it.isNotBlank() }
 
     private suspend fun downloadMangaChapterForOffline(chapterUrl: String): Response<Unit> {
         val source = scraper.getCompatibleSource(rawBookUrl)

@@ -81,6 +81,7 @@ class ChaptersActivity : BaseActivity() {
                     onCoverLongClick = { searchBookInDatabase(input = viewModel.bookTitle) },
                     onChangeCover = onDoAskForImage { viewModel.saveImageAsCover(it) },
                     onOpenInBrowser = { navigationRoutes.webView(this, url = it).let(::startActivity) },
+                    onChapterSourceSelected = viewModel::onChapterSourceSelected,
                     onGlobalSearchClick = { navigationRoutes.globalSearch(this, text = it).let(::startActivity) }
                 )
             }
@@ -121,7 +122,12 @@ class ChaptersActivity : BaseActivity() {
             Log.d("ChaptersActivity", "openBookAtChapter: isManga=$isManga")
 
             val intent = if (isManga) {
-                navigationRoutes.mangaReader(this@ChaptersActivity, bookUrl = bookUrl, chapterUrl = chapterUrl)
+                navigationRoutes.mangaReader(
+                    this@ChaptersActivity,
+                    bookUrl = bookUrl,
+                    chapterUrl = chapterUrl,
+                    chapterSource = viewModel.state.selectedChapterSource.value,
+                )
             } else {
                 navigationRoutes.reader(this@ChaptersActivity, bookUrl = bookUrl, chapterUrl = chapterUrl)
             }

@@ -112,10 +112,15 @@ fun LibraryScreen(
                             ?: return@launch
 
                         val intent = if (book.book.contentType == ContentType.MANGA) {
+                            val chapterSource = libraryModel.getPreferredMangaSource(
+                                bookUrl = book.book.url,
+                                contentType = book.book.contentType,
+                            )
                             navigationRouteViewModel.mangaReader(
                                 context = context,
                                 bookUrl = book.book.url,
-                                chapterUrl = chapterUrl
+                                chapterUrl = chapterUrl,
+                                chapterSource = chapterSource,
                             )
                         } else {
                             navigationRouteViewModel.reader(

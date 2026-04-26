@@ -1,5 +1,7 @@
 package my.novelreader.scraper
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import my.novelreader.network.NetworkClient
 import my.novelreader.scraper.databases.BakaUpdates
 import my.novelreader.scraper.databases.NovelUpdates
@@ -27,7 +29,6 @@ import my.novelreader.scraper.sources.AllNovel
 import my.novelreader.scraper.sources.NovelBinCom
 import my.novelreader.scraper.sources.NewNovel
 import my.novelreader.scraper.sources.NoBadNovel
-import my.novelreader.scraper.sources.WtrLab
 import my.novelreader.scraper.sources.Shuba69
 import my.novelreader.scraper.sources.UuKanshu
 import my.novelreader.scraper.sources.Ddxss
@@ -37,11 +38,13 @@ import my.novelreader.scraper.sources.Ttkan
 import my.novelreader.scraper.sources.MangaDex
 import my.novelreader.scraper.sources.KingOfShojo
 import my.novelreader.scraper.sources.AsuraScans
+import my.novelreader.scraper.sources.ComixTo
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class Scraper @Inject constructor(
+    @ApplicationContext appContext: Context,
     networkClient: NetworkClient,
     localSource: LocalSource
 ) {
@@ -82,10 +85,10 @@ class Scraper @Inject constructor(
         NovelBinCom(networkClient),
         NewNovel(networkClient),
         NoBadNovel(networkClient),
-        WtrLab(networkClient),
         MangaDex(networkClient),
         KingOfShojo(networkClient),
         AsuraScans(networkClient),
+        ComixTo(networkClient, appContext),
     )
 
     val sourcesCatalogsList = sourcesList.filterIsInstance<SourceInterface.Catalog>()

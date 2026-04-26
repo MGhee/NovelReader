@@ -26,6 +26,7 @@ interface NavigationRoutes {
         context: Context,
         bookUrl: String,
         chapterUrl: String,
+        chapterSource: String? = null,
     ): Intent
 
     fun databaseSearch(

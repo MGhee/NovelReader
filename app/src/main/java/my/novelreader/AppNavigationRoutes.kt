@@ -42,11 +42,13 @@ class AppNavigationRoutes @Inject constructor() : NavigationRoutes {
         context: Context,
         bookUrl: String,
         chapterUrl: String,
+        chapterSource: String?,
     ): Intent {
         return MangaReaderActivity.IntentData(
             context,
             bookUrl = bookUrl,
             chapterUrl = chapterUrl,
+            chapterSource = chapterSource,
         )
     }
 
