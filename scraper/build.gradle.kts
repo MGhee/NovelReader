@@ -13,6 +13,7 @@ dependencies {
     implementation(projects.strings)
     implementation(projects.core)
     implementation(projects.networking)
+    implementation(projects.tooling.epubParser)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.jsoup)

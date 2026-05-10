@@ -122,8 +122,17 @@ internal class ChaptersViewModel @Inject constructor(
             val contentType = if (source is MangaSourceInterface) ContentType.MANGA else ContentType.NOVEL
             appRepository.libraryBooks.updateContentType(bookUrl, contentType)
 
-            if (appRepository.libraryBooks.get(bookUrl) != null)
+            val existing = appRepository.libraryBooks.get(bookUrl)
+            if (existing != null) {
+                // Existing library books can sit with an empty coverImageUrl if they were
+                // bookmarked before metadata was fetched. Backfill on chapter-list open for
+                // any remote source — the lookup is cached so this is near-free after the
+                // first successful fetch.
+                if (existing.coverImageUrl.isBlank() && !state.isLocalSource.value) {
+                    updateCover()
+                }
                 return@launch
+            }
 
             chaptersRepository.downloadBookMetadata(bookUrl = bookUrl, bookTitle = bookTitle)
         }

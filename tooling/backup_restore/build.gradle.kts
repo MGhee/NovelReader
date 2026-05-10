@@ -13,6 +13,7 @@ dependencies {
     implementation(projects.coreui)
     implementation(projects.strings)
     implementation(projects.data)
+    implementation(projects.scraper)
     implementation(projects.tooling.localDatabase)
 
     implementation(libs.kotlinx.serialization.json)

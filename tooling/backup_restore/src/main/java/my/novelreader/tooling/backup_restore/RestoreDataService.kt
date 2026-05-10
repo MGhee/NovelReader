@@ -26,6 +26,7 @@ import my.novelreader.data.BookChaptersRepository
 import my.novelreader.data.ChapterBodyRepository
 import my.novelreader.data.DownloaderRepository
 import my.novelreader.data.LibraryBooksRepository
+import my.novelreader.scraper.Scraper
 import my.novelreader.core.AppCoroutineScope
 import my.novelreader.core.AppFileResolver
 import my.novelreader.core.tryAsResponse
@@ -66,6 +67,12 @@ class RestoreDataService : Service() {
 
     @Inject
     lateinit var downloaderRepository: DownloaderRepository
+
+    @Inject
+    lateinit var scraper: Scraper
+
+    @Inject
+    lateinit var libraryBooksRepository: LibraryBooksRepository
 
     private class IntentData : Intent {
         var uri by Extra_Uri()
@@ -373,7 +380,12 @@ class RestoreDataService : Service() {
                         chapterBodyDao = newDatabase.chapterBodyDao(),
                         appDatabase = newDatabase,
                         bookChaptersRepository = bookChapters,
-                        downloaderRepository = downloaderRepository
+                        downloaderRepository = downloaderRepository,
+                        // libraryBooks/scraper are unused by the only call this manual
+                        // instance handles (`getAll()`); pass the live singletons so
+                        // the type system is satisfied without a separate constructor.
+                        libraryBooksRepository = libraryBooksRepository,
+                        scraper = scraper,
                     )
                     val libraryBooks = LibraryBooksRepository(
                         libraryDao = newDatabase.libraryDao(),

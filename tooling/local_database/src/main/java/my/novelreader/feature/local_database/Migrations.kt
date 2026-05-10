@@ -130,10 +130,45 @@ internal fun databaseMigrations() = arrayOf(
         it.execSQL("CREATE INDEX IF NOT EXISTS index_LibraryUpdateError_bookUrl ON LibraryUpdateError (bookUrl)")
     },
     migration(18) {
-        // Add lastReadMangaPage column for manga reader position tracking
-        it.execSQL("ALTER TABLE Chapter ADD COLUMN lastReadMangaPage INTEGER NOT NULL DEFAULT 0")
+        // Recreate Chapter so `bookmarked` and `lastReadMangaPage` carry the
+        // DEFAULT 0 clauses Room now demands. Some debug installs ended up with
+        // these columns but no defaults; SQLite can't add a default in place.
+        val hasManga = hasColumn(it, "Chapter", "lastReadMangaPage")
+        it.execSQL("""
+            CREATE TABLE Chapter_new (
+                title TEXT NOT NULL,
+                url TEXT NOT NULL,
+                bookUrl TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                read INTEGER NOT NULL,
+                lastReadPosition INTEGER NOT NULL,
+                lastReadOffset INTEGER NOT NULL,
+                bookmarked INTEGER NOT NULL DEFAULT 0,
+                lastReadMangaPage INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(url)
+            )
+        """.trimIndent())
+        val mangaSelect = if (hasManga) "lastReadMangaPage" else "0"
+        it.execSQL("""
+            INSERT INTO Chapter_new
+                (title, url, bookUrl, position, read, lastReadPosition, lastReadOffset, bookmarked, lastReadMangaPage)
+            SELECT title, url, bookUrl, position, read, lastReadPosition, lastReadOffset, bookmarked, $mangaSelect
+            FROM Chapter
+        """.trimIndent())
+        it.execSQL("DROP TABLE Chapter")
+        it.execSQL("ALTER TABLE Chapter_new RENAME TO Chapter")
+        it.execSQL("CREATE INDEX IF NOT EXISTS index_Chapter_bookUrl ON Chapter (bookUrl)")
     },
 )
+
+private fun hasColumn(db: SupportSQLiteDatabase, table: String, column: String): Boolean =
+    db.query("PRAGMA table_info($table)").use { c ->
+        val nameIdx = c.getColumnIndex("name")
+        while (c.moveToNext()) {
+            if (c.getString(nameIdx) == column) return@use true
+        }
+        false
+    }
 
 internal fun migration(vi: Int, migrate: (SupportSQLiteDatabase) -> Unit) =
     object : Migration(vi, vi + 1) {

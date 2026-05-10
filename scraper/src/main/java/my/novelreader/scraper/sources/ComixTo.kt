@@ -25,16 +25,19 @@ import my.novelreader.scraper.sources.util.ComixToChapterScraper
 import my.novelreader.strings.R
 import okhttp3.Request
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.ceil
 
 /**
  * Comix.to manga source.
  *
  * Comix.to is a Next.js client-rendered SPA. Catalog and search go through the public JSON
  * API:
- *   • Catalog: /api/v2/manga?order[views_30d]=desc&genres_mode=and&limit=28&page={n}
- *   • Search:  /api/v2/manga?keyword={q}&order[relevance]=desc&limit=28&page={n}
+ *   • Catalog: /api/v1/manga?order[chapter_updated_at]=desc&limit=28&page={n}
+ *   • Search:  /api/v1/manga?keyword={q}&order[relevance]=desc&limit=28&page={n}
  *
  * The chapters endpoint is gated by a JS-set session cookie we can't replicate from a plain
  * HTTP client, so the chapter list is scraped from the rendered title page via WebView (see
@@ -68,27 +71,42 @@ class ComixTo(
 
     private companion object {
         const val TAG = "ComixTo"
-        const val API_BASE = "https://comix.to/api/v2"
+        const val API_BASE = "https://comix.to/api/v1"
         const val CATALOG_PAGE_SIZE = 28
+        const val CHAPTERS_PAGE_SIZE = 20
         const val MAX_PAGE_PROBE = 200
         const val MAX_CONSECUTIVE_IMAGE_MISSES = 5
     }
 
+    private data class HtmlChapterItem(
+        val url: String,
+        val rawTitle: String,
+        val groupName: String,
+        val number: Double,
+    )
+
     @Serializable
-    private data class CatalogEnvelope(val result: CatalogResult? = null)
+    private data class CatalogEnvelope(
+        val status: String? = null,
+        val result: CatalogResult? = null,
+    )
 
     @Serializable
     private data class CatalogResult(
         val items: List<CatalogItem> = emptyList(),
         val pagination: Pagination? = null,
+        val meta: CatalogMeta? = null,
     )
 
     @Serializable
     private data class CatalogItem(
         val manga_id: Long = 0,
+        val id: Long = 0,
         val hash_id: String = "",
+        val hid: String = "",
         val title: String = "",
         val slug: String = "",
+        val url: String = "",
         val poster: Poster? = null,
         val synopsis: String? = null,
     )
@@ -105,6 +123,16 @@ class ComixTo(
         val current_page: Int = 1,
         val last_page: Int = 1,
         val total: Int = 0,
+    )
+
+    @Serializable
+    private data class CatalogMeta(
+        val total: Int = 0,
+        val perPage: Int = CATALOG_PAGE_SIZE,
+        val page: Int = 1,
+        val lastPage: Int = 1,
+        val hasNext: Boolean = false,
+        val hasPrev: Boolean = false,
     )
 
     @Serializable
@@ -139,7 +167,7 @@ class ComixTo(
         withContext(Dispatchers.Default) {
             tryConnect("index=$index") {
                 fetchCatalog(
-                    url = "$API_BASE/manga?order%5Bviews_30d%5D=desc&genres_mode=and" +
+                    url = "$API_BASE/manga?order%5Bchapter_updated_at%5D=desc" +
                         "&limit=$CATALOG_PAGE_SIZE&page=${index + 1}",
                     pageIndex = index,
                 )
@@ -168,17 +196,26 @@ class ComixTo(
 
         val books = result.items.mapNotNull { it.toBookResult() }
         val pagination = result.pagination
+        val meta = result.meta
         val isLastPage = books.isEmpty() ||
+            (meta?.hasNext == false) ||
+            (meta != null && meta.page >= meta.lastPage) ||
             (pagination != null && pagination.current_page >= pagination.last_page)
         return PagedList(books, pageIndex, isLastPage = isLastPage)
     }
 
     private fun CatalogItem.toBookResult(): BookResult? {
-        if (hash_id.isBlank() || slug.isBlank() || title.isBlank()) return null
+        if (title.isBlank()) return null
+        val bookUrl = when {
+            url.startsWith("http") -> url
+            hid.isNotBlank() -> "$baseUrl/title/$hid"
+            hash_id.isNotBlank() && slug.isNotBlank() -> "$baseUrl/title/$hash_id-$slug"
+            else -> return null
+        }
         val cover = poster?.medium ?: poster?.large ?: poster?.small ?: ""
         return BookResult(
             title = title,
-            url = "$baseUrl/title/$hash_id-$slug",
+            url = bookUrl,
             coverImageUrl = cover,
             description = synopsis.orEmpty(),
         )
@@ -187,13 +224,19 @@ class ComixTo(
     override suspend fun getBookCoverImageUrl(bookUrl: String): Response<String?> =
         withContext(Dispatchers.Default) {
             tryConnect("url=$bookUrl") {
-                // Best-effort static fetch — if the title page is fully client-rendered,
-                // the BookResult cover from the catalog API is already populated.
                 val body = networkClient.get(bookUrl).bodyString()
                 val doc = Jsoup.parse(body)
-                doc.selectFirst("img[itemProp=image][src*=static.comix.to]")?.attr("src")
-                    ?: doc.selectFirst("img[itemProp=image]")?.attr("src")
-                    ?: doc.selectFirst("img[src*=static.comix.to]")?.attr("src")
+                doc.selectFirst("meta[property=og:image][content]")?.attr("content")
+                    ?.takeIf { it.isNotBlank() }
+                    ?: doc.selectFirst("meta[name=twitter:image][content]")?.attr("content")
+                        ?.takeIf { it.isNotBlank() }
+                    ?: doc.selectFirst("img[itemProp=image][src]")?.absUrl("src")
+                        ?.takeIf { it.isNotBlank() }
+                    ?: doc.selectFirst("img[src*=static.comix.to]")?.absUrl("src")
+                        ?.takeIf { it.isNotBlank() }
+                    ?: Regex("""https://static\.comix\.to/[^\"'\s>]+""")
+                        .find(body)
+                        ?.value
             }
         }
 
@@ -211,6 +254,9 @@ class ComixTo(
     override suspend fun getChapterList(bookUrl: String): Response<List<ChapterResult>> =
         tryConnect("url=$bookUrl") {
             Log.i(TAG, "getChapterList bookUrl=$bookUrl")
+            loadChapterListViaHtml(bookUrl)
+                ?.also { return@tryConnect it }
+
             val titleSegment = bookUrl.substringAfter("/title/")
                 .substringBefore("/")
                 .substringBefore("?")
@@ -255,6 +301,106 @@ class ComixTo(
                     ChapterResult(title = title, url = absolute)
                 }
         }
+
+    private suspend fun loadChapterListViaHtml(bookUrl: String): List<ChapterResult>? = runCatching {
+        fetchChapterListViaHtml(bookUrl)
+    }.onFailure {
+        Log.w(TAG, "html chapter scrape failed for $bookUrl", it)
+    }.getOrNull()?.takeIf { it.isNotEmpty() }?.also { chapters ->
+        Log.i(TAG, "loaded ${chapters.size} chapters via html for $bookUrl")
+    }
+
+    private suspend fun fetchChapterListViaHtml(bookUrl: String): List<ChapterResult> {
+        val normalizedBookUrl = bookUrl.substringBefore('?')
+        val firstDoc = Jsoup.parse(networkClient.get(normalizedBookUrl).bodyString())
+        val totalPages = readHtmlChapterPages(firstDoc)
+        val remainingDocs = coroutineScope {
+            (2..totalPages).map { page ->
+                async {
+                    Jsoup.parse(networkClient.get(withPage(normalizedBookUrl, page)).bodyString())
+                }
+            }.awaitAll()
+        }
+
+        return buildList {
+            addAll(parseHtmlChapterItems(firstDoc))
+            remainingDocs.forEach { addAll(parseHtmlChapterItems(it)) }
+        }
+            .distinctBy { it.url.substringBefore('?') }
+            .sortedWith(
+                compareBy<HtmlChapterItem> {
+                    it.groupName.ifBlank { "~" }.lowercase()
+                }.thenBy {
+                    it.number
+                }.thenBy {
+                    it.rawTitle.lowercase()
+                }
+            )
+            .map { item ->
+                val rawTitle = item.rawTitle.ifBlank {
+                    val numStr = if (item.number > 0.0) formatNumber(item.number) else item.url.substringAfterLast('/')
+                    "Ch. $numStr"
+                }
+                val title = if (item.groupName.isNotBlank()) "$rawTitle — ${item.groupName}" else rawTitle
+                ChapterResult(title = title, url = item.url)
+            }
+    }
+
+    private fun readHtmlChapterPages(doc: Document): Int {
+        val text = doc.text()
+        val totalItems = Regex("""Showing\s+\d+\s+to\s+\d+\s+of\s+([\d,]+)\s+items""")
+            .find(text)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.replace(",", "")
+            ?.toIntOrNull()
+            ?: return 1
+        return ceil(totalItems / CHAPTERS_PAGE_SIZE.toDouble()).toInt().coerceAtLeast(1)
+    }
+
+    private fun parseHtmlChapterItems(doc: Document): List<HtmlChapterItem> =
+        doc.select("a[href*=/title/][href*=-chapter-]")
+            .mapNotNull { anchor ->
+                val href = anchor.absUrl("href").ifBlank { anchor.attr("href") }
+                if (href.isBlank()) return@mapNotNull null
+
+                val rawTitle = anchor.text().trim()
+                val groupName = anchor.findNearestGroupName()
+                HtmlChapterItem(
+                    url = href,
+                    rawTitle = rawTitle,
+                    groupName = groupName,
+                    number = extractChapterNumber(href),
+                )
+            }
+
+    private fun Element.findNearestGroupName(): String {
+        var current: Element? = parent()
+        repeat(6) {
+            val group = current
+                ?.select("a[href*=/groups/]")
+                ?.firstOrNull()
+                ?.text()
+                ?.trim()
+                .orEmpty()
+            if (group.isNotBlank()) return group
+            current = current?.parent()
+        }
+
+        var sibling: Element? = nextElementSibling()
+        repeat(4) {
+            val group = sibling?.takeIf { it.attr("href").contains("/groups/") }
+                ?.text()
+                ?.trim()
+                .orEmpty()
+            if (group.isNotBlank()) return group
+            sibling = sibling?.nextElementSibling()
+        }
+        return ""
+    }
+
+    private fun withPage(bookUrl: String, page: Int): String =
+        if ('?' in bookUrl) "$bookUrl&page=$page" else "$bookUrl?page=$page"
 
     private suspend fun loadChapterListViaApi(
         bookUrl: String,

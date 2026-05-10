@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
@@ -17,14 +18,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import my.novelreader.core.ChapterDownloadProgress
 import my.novelreader.coreui.components.AnimatedTransition
 import my.novelreader.coreui.theme.ColorNotice
 import my.novelreader.coreui.theme.InternalTheme
@@ -47,6 +55,13 @@ internal fun ChaptersScreenChapterItem(
     onBookmarkChange: (Boolean) -> Unit = {}
 ) {
     val chapter = chapterWithContext.chapter
+    val downloadProgressMap by ChapterDownloadProgress.flow.collectAsState()
+    val downloadProgress = remember(downloadProgressMap, chapter.url, chapterWithContext.downloaded) {
+        when {
+            chapterWithContext.downloaded -> 1f
+            else -> downloadProgressMap[chapter.url] ?: 0f
+        }
+    }
     ListItem(
         headlineContent = {
             Text(
@@ -80,11 +95,7 @@ internal fun ChaptersScreenChapterItem(
                         )
                     }
                     IconButton(onClick = onDownload) {
-                        Icon(
-                            if (chapterWithContext.downloaded) Icons.Filled.CloudDownload
-                            else Icons.Outlined.CloudDownload,
-                            null
-                        )
+                        DownloadCloud(progress = downloadProgress)
                     }
                 }
             }
@@ -103,6 +114,50 @@ internal fun ChaptersScreenChapterItem(
     )
 }
 
+
+/**
+ * Cloud-download glyph that "fills up" as the chapter downloads. Three stacked layers:
+ *  1. The outlined cloud in the row's content color — always drawn, so an empty cloud is
+ *     visible at progress = 0.
+ *  2. The filled cloud clipped to the bottom-up progress portion in the same content
+ *     color — paints the solid "filled" body up to the current fill line.
+ *  3. The outlined cloud again, but tinted in the row's surface color and clipped to the
+ *     same progress portion. Its strokes (cloud edge + the inner arrow) appear in the row
+ *     background color over the filled body, so the arrow reads as a "punched-out" cutout
+ *     against the white fill instead of vanishing into it.
+ */
+@Composable
+private fun DownloadCloud(progress: Float) {
+    val cloudTint = LocalContentColor.current
+    val cutoutTint = MaterialTheme.colorScheme.surface
+    val clamped = progress.coerceIn(0f, 1f)
+    Box(contentAlignment = Alignment.Center) {
+        Icon(
+            imageVector = Icons.Outlined.CloudDownload,
+            contentDescription = null,
+            tint = cloudTint,
+        )
+        if (clamped > 0f) {
+            val clipModifier = Modifier.drawWithContent {
+                clipRect(top = size.height * (1f - clamped)) {
+                    this@drawWithContent.drawContent()
+                }
+            }
+            Icon(
+                imageVector = Icons.Filled.CloudDownload,
+                contentDescription = null,
+                tint = cloudTint,
+                modifier = clipModifier,
+            )
+            Icon(
+                imageVector = Icons.Outlined.CloudDownload,
+                contentDescription = null,
+                tint = cutoutTint,
+                modifier = clipModifier,
+            )
+        }
+    }
+}
 
 @PreviewThemes
 @Composable
@@ -142,7 +197,7 @@ private class PreviewProvider : PreviewParameterProvider<PreviewProviderState> {
                     read = false
                 ),
                 downloaded = false,
-                lastReadChapter = false
+                lastReadChapter = false,
             ),
             selected = false
         ),
@@ -158,7 +213,7 @@ private class PreviewProvider : PreviewParameterProvider<PreviewProviderState> {
                     read = true
                 ),
                 downloaded = true,
-                lastReadChapter = false
+                lastReadChapter = false,
             ),
             selected = false
         ),
@@ -174,7 +229,7 @@ private class PreviewProvider : PreviewParameterProvider<PreviewProviderState> {
                     read = false
                 ),
                 downloaded = true,
-                lastReadChapter = true
+                lastReadChapter = true,
             ),
             selected = true
         )

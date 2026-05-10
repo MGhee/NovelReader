@@ -37,5 +37,7 @@ data class SettingsScreenState(
 
     data class LibraryAutoUpdate(
         val autoDownloadNewChapters: MutableState<Boolean>,
+        val autoUpdateEnabled: MutableState<Boolean>,
+        val autoUpdateIntervalHours: MutableState<Int>,
     )
 }

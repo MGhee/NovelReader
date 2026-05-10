@@ -1,5 +1,6 @@
 package my.novelreader.data
 
+import android.util.Log
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.jsonArray
@@ -10,6 +11,8 @@ import my.novelreader.core.map
 import my.novelreader.feature.local_database.AppDatabase
 import my.novelreader.feature.local_database.DAOs.ChapterBodyDao
 import my.novelreader.feature.local_database.tables.ChapterBody
+import my.novelreader.scraper.LightNovelSourceInterface
+import my.novelreader.scraper.Scraper
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,6 +22,8 @@ class ChapterBodyRepository @Inject constructor(
     private val appDatabase: AppDatabase,
     private val bookChaptersRepository: BookChaptersRepository,
     private val downloaderRepository: DownloaderRepository,
+    private val libraryBooksRepository: LibraryBooksRepository,
+    private val scraper: Scraper,
 ) {
     companion object {
         private const val MANGA_PAGES_PREFIX = "MANGA_PAGES::"
@@ -37,6 +42,29 @@ class ChapterBodyRepository @Inject constructor(
         insertReplace(chapterBody)
         if (title != null)
             bookChaptersRepository.updateTitle(chapterBody.url, title)
+    }
+
+    /**
+     * For light-novel sources whose covers come from per-volume EPUB content, refresh the
+     * book's cover after a chapter body is fetched. The scraper will have just written the
+     * latest volume's cover image to local disk during chapter parse; calling
+     * `getBookCoverImageUrl` returns the local cache-busting path which we persist to the
+     * book row so the chapters list / library re-render with the new cover.
+     */
+    private suspend fun refreshLightNovelCoverIfApplicable(chapterUrl: String) {
+        try {
+            val chapter = bookChaptersRepository.get(chapterUrl) ?: return
+            refreshLightNovelCoverForBook(chapter.bookUrl)
+        } catch (e: Exception) {
+            Log.w("ChapterBodyRepository", "light-novel cover refresh failed for $chapterUrl: ${e.message}")
+        }
+    }
+
+    private suspend fun refreshLightNovelCoverForBook(bookUrl: String) {
+        val source = scraper.getCompatibleSource(bookUrl) as? LightNovelSourceInterface ?: return
+        val response = source.getBookCoverImageUrl(bookUrl)
+        val newCover = (response as? Response.Success)?.data?.takeIf { it.isNotBlank() } ?: return
+        libraryBooksRepository.updateCover(bookUrl, newCover)
     }
 
     suspend fun fetchBody(urlChapter: String, tryCache: Boolean = true): Response<String> {
@@ -61,6 +89,7 @@ class ChapterBodyRepository @Inject constructor(
                     chapterBody = ChapterBody(url = urlChapter, body = it.body),
                     title = it.title
                 )
+                refreshLightNovelCoverIfApplicable(urlChapter)
                 it.body
             }
     }
@@ -76,6 +105,7 @@ class ChapterBodyRepository @Inject constructor(
                     chapterBody = ChapterBody(url = chapterUrl, body = it.body),
                     title = it.title
                 )
+                refreshLightNovelCoverIfApplicable(chapterUrl)
             }
     }
 
@@ -126,6 +156,19 @@ class ChapterBodyRepository @Inject constructor(
                     bookChaptersRepository.updateTitle(body.url, title)
                 }
             }
+        }
+        // For bulk light-novel downloads the scraper rewrote each book's local cover file
+        // as it parsed each EPUB; the latest write wins. Refresh once per distinct book
+        // instead of per-chapter.
+        try {
+            val bookUrls = items.mapNotNull { (body, _) ->
+                bookChaptersRepository.get(body.url)?.bookUrl
+            }.toSet()
+            for (bookUrl in bookUrls) {
+                refreshLightNovelCoverForBook(bookUrl)
+            }
+        } catch (e: Exception) {
+            Log.w("ChapterBodyRepository", "batch light-novel cover refresh failed: ${e.message}")
         }
     }
 

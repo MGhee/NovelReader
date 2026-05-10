@@ -7,21 +7,29 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import android.util.Log
 import my.novelreader.core.Toasty
 import my.novelreader.coreui.BaseViewModel
 import my.novelreader.data.AppRepository
+import my.novelreader.data.DownloaderRepository
 import my.novelreader.data.LibraryFilters
 import my.novelreader.data.LibrarySort
 import my.novelreader.data.SortDirection
 import my.novelreader.data.LibraryDisplayMode
 import my.novelreader.data.CategoriesRepository
 import my.novelreader.core.AppFileResolver
+import my.novelreader.core.Response
 import my.novelreader.core.removeLocalUriPrefix
 import java.io.File
 import my.novelreader.core.appPreferences.AppPreferences
@@ -29,6 +37,7 @@ import my.novelreader.interactor.WorkersInteractions
 import my.novelreader.core.utils.asMutableStateOf
 import my.novelreader.feature.local_database.BookWithContext
 import my.novelreader.feature.local_database.tables.ContentType
+import my.novelreader.scraper.Scraper
 import javax.inject.Inject
 
 @HiltViewModel
@@ -39,10 +48,13 @@ internal class LibraryViewModel @Inject constructor(
     private val workersInteractions: WorkersInteractions,
     private val toasty: Toasty,
     private val categoriesRepository: CategoriesRepository,
+    private val scraper: Scraper,
+    private val downloaderRepository: DownloaderRepository,
     stateHandle: SavedStateHandle,
 ) : BaseViewModel() {
     private companion object {
         const val CHAPTER_SOURCE_DELIMITER = " — "
+        const val BACKFILL_CONCURRENCY = 3
     }
 
     var showBottomSheet by stateHandle.asMutableStateOf("showBottomSheet") { false }
@@ -147,6 +159,49 @@ internal class LibraryViewModel @Inject constructor(
             workersInteractions.observeActiveDownloads().collect { activeProgress ->
                 downloadProgress = activeProgress
             }
+        }
+
+        // One-shot backfill: light-novel sources populate covers via a metadata API
+        // (Jikan/AniList) whose results are permanently cached. Sweep the library on
+        // ViewModel construction so any LN book sitting with an empty cover — added
+        // before the lookup landed, or bookmarked through a path that didn't fetch
+        // metadata — gets one regardless of whether the user opens it.
+        viewModelScope.launch(Dispatchers.IO) {
+            backfillLightNovelCovers()
+        }
+    }
+
+    private suspend fun backfillLightNovelCovers() {
+        val all = try {
+            appRepository.libraryBooks.getAllInLibrary()
+        } catch (e: Exception) {
+            Log.w("LibraryViewModel", "cover backfill: failed to read library: ${e.message}")
+            return
+        }
+        val targets = all.filter { book ->
+            book.coverImageUrl.isBlank() &&
+                (scraper.getCompatibleSourceCatalog(book.url)?.isLocalSource == false)
+        }
+        if (targets.isEmpty()) return
+        val gate = Semaphore(BACKFILL_CONCURRENCY)
+        coroutineScope {
+            targets.map { book ->
+                async {
+                    gate.withPermit {
+                        runCatching {
+                            val response = downloaderRepository.bookCoverImageUrl(book.url)
+                            val cover = (response as? Response.Success)?.data
+                                ?.takeIf { it.isNotBlank() }
+                                ?: return@runCatching
+                            // Re-check inLibrary in case the row was removed mid-sweep.
+                            if (appRepository.libraryBooks.get(book.url) == null) return@runCatching
+                            appRepository.libraryBooks.updateCover(book.url, cover)
+                        }.onFailure {
+                            Log.w("LibraryViewModel", "cover backfill failed for ${book.url}: ${it.message}")
+                        }
+                    }
+                }
+            }.awaitAll()
         }
     }
 

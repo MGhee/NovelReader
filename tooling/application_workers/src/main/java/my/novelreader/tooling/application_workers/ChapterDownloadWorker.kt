@@ -49,12 +49,13 @@ internal class ChapterDownloadWorker @AssistedInject constructor(
     companion object {
         const val TAG = "ChapterDownload"
         private const val DATA_BOOK_URL = "bookUrl"
+        private const val DATA_CHAPTER_LIMIT = "chapterLimit"
         private const val BATCH_SIZE = 50
         private const val CHAPTER_SOURCE_DELIMITER = " — "
         private const val DEFAULT_MANGA_CHAPTER_CONCURRENCY = 4
         private const val COMIX_MANGA_CHAPTER_CONCURRENCY = 1
 
-        fun createRequest(bookUrl: String): OneTimeWorkRequest {
+        fun createRequest(bookUrl: String, chapterLimit: Int = 0): OneTimeWorkRequest {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
@@ -65,6 +66,7 @@ internal class ChapterDownloadWorker @AssistedInject constructor(
                 .setInputData(
                     Data.Builder()
                         .putString(DATA_BOOK_URL, bookUrl)
+                        .putInt(DATA_CHAPTER_LIMIT, chapterLimit)
                         .build()
                 )
                 .build()
@@ -126,11 +128,22 @@ internal class ChapterDownloadWorker @AssistedInject constructor(
                     )
                 }
 
-                val totalChapters = bookChaptersRepository.chaptersCount(bookUrl)
-                val chaptersToDownload = bookChaptersRepository.getChaptersWithoutBody(bookUrl)
-                val alreadyDownloaded = totalChapters - chaptersToDownload.size
+                val chapterLimit = inputData.getInt(DATA_CHAPTER_LIMIT, 0)
+                val pendingChapters = bookChaptersRepository.getChaptersWithoutBody(bookUrl)
+                val chaptersToDownload = if (chapterLimit > 0) {
+                    pendingChapters.sortedBy { it.position }.take(chapterLimit)
+                } else {
+                    pendingChapters
+                }
+                val totalChapters = if (chapterLimit > 0) {
+                    chaptersToDownload.size
+                } else {
+                    bookChaptersRepository.chaptersCount(bookUrl)
+                }
+                val alreadyDownloaded =
+                    if (chapterLimit > 0) 0 else totalChapters - chaptersToDownload.size
 
-                Timber.d("ChapterDownloadWorker: $alreadyDownloaded already downloaded, ${chaptersToDownload.size} remaining out of $totalChapters total for $bookUrl")
+                Timber.d("ChapterDownloadWorker: $alreadyDownloaded already downloaded, ${chaptersToDownload.size} remaining out of $totalChapters total for $bookUrl (limit=$chapterLimit)")
 
                 if (chaptersToDownload.isEmpty()) {
                     setProgress(

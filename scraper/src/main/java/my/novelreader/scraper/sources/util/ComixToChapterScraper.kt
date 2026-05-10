@@ -155,7 +155,7 @@ internal class ComixToChapterScraper(private val context: Context) {
             val all = firstPage.toMutableList()
 
             for (page in 2..totalPages) {
-                val nextPage = navigateAndExtract(webView, page, pollIntervalMs)
+                val nextPage = navigateAndExtract(webView, bookUrl, page, pollIntervalMs, loadTimeoutMs)
                 if (nextPage.isEmpty()) {
                     Log.w(TAG, "page $page returned 0 chapters — stopping")
                     break
@@ -176,31 +176,15 @@ internal class ComixToChapterScraper(private val context: Context) {
 
     private suspend fun navigateAndExtract(
         webView: WebView,
+        bookUrl: String,
         page: Int,
         pollIntervalMs: Long,
+        loadTimeoutMs: Long,
     ): List<ScrapedChapter> {
-        // Capture the current first-chapter URL so we can detect when the list re-renders.
-        val before = evaluateJavascript(webView, FIRST_CHAPTER_URL_JS)
-        // Click the Next button (or the page-link[href="#N"]) to trigger client-side
-        // pagination. We try multiple selectors because the markup varies between layouts.
-        val clickJs = """
-            (function() {
-                var byPage = document.querySelector('a.page-link[href="#$page"]');
-                if (byPage) { byPage.click(); return 'clicked-page-link'; }
-                var next = document.querySelector('.pagination .page-item:not(.disabled) a.page-link');
-                if (next) { next.click(); return 'clicked-next'; }
-                window.location.hash = '#$page';
-                return 'hash-fallback';
-            })()
-        """.trimIndent()
-        evaluateJavascript(webView, clickJs)
-
+        val pageUrl = withPage(bookUrl, page)
+        awaitPageFinishedOrTimeout(webView, pageUrl, loadTimeoutMs)
         return withTimeoutOrNull(15_000L) {
-            // Wait for the first chapter URL to change (i.e., list re-rendered).
-            while (evaluateJavascript(webView, FIRST_CHAPTER_URL_JS) == before) {
-                delay(pollIntervalMs)
-            }
-            extractChapters(webView)
+            pollForChapters(webView, pollIntervalMs)
         } ?: emptyList()
     }
 
@@ -291,34 +275,56 @@ internal class ComixToChapterScraper(private val context: Context) {
             .replace("\\n", "\n")
     }
 
+    private fun withPage(bookUrl: String, page: Int): String {
+        val cleanUrl = bookUrl.substringBefore('#')
+        val withoutPage = cleanUrl
+            .replace(Regex("([?&])page=\\d+&?"), "$1")
+            .replace(Regex("[?&]$"), "")
+        return if ('?' in withoutPage) "$withoutPage&page=$page" else "$withoutPage?page=$page"
+    }
+
     private companion object {
         const val TAG = "ComixToScraper"
 
         val EXTRACT_CHAPTERS_JS = """
-            JSON.stringify(Array.from(document.querySelectorAll('ul.chap-list li a.title')).map(function(a) {
-                var li = a.closest('li');
-                var grp = li ? li.querySelector('.meta__group') : null;
-                return {
-                    u: a.getAttribute('href') || '',
-                    t: (a.textContent || '').trim(),
-                    g: grp ? (grp.textContent || '').trim() : ''
-                };
-            }))
+            JSON.stringify(
+                Array.from(document.querySelectorAll('a[href*="/title/"][href*="-chapter-"]'))
+                    .map(function(a) {
+                        var href = a.getAttribute('href') || '';
+                        var title = (a.textContent || '').trim();
+                        if (!href || !title) return null;
+
+                        var group = '';
+                        var current = a.parentElement;
+                        for (var i = 0; i < 6 && current && !group; i++) {
+                            var groupAnchor = current.querySelector('a[href*="/groups/"]');
+                            if (groupAnchor) group = (groupAnchor.textContent || '').trim();
+                            current = current.parentElement;
+                        }
+
+                        var sibling = a.nextElementSibling;
+                        for (var j = 0; j < 4 && sibling && !group; j++) {
+                            if ((sibling.getAttribute('href') || '').indexOf('/groups/') !== -1) {
+                                group = (sibling.textContent || '').trim();
+                                break;
+                            }
+                            sibling = sibling.nextElementSibling;
+                        }
+
+                        return { u: href, t: title, g: group };
+                    })
+                    .filter(Boolean)
+            )
         """.trimIndent()
 
         val TOTAL_PAGES_JS = """
             (function() {
-                var span = document.querySelector('.go-page span');
-                if (!span) return '1';
-                var m = (span.textContent || '').match(/of\s+([\d,]+)/);
-                return m ? m[1].replace(/,/g, '') : '1';
-            })()
-        """.trimIndent()
-
-        val FIRST_CHAPTER_URL_JS = """
-            (function() {
-                var a = document.querySelector('ul.chap-list li a.title');
-                return a ? (a.getAttribute('href') || '') : '';
+                var text = (document.body && document.body.innerText) || '';
+                var m = text.match(/Showing\s+\d+\s+to\s+\d+\s+of\s+([\d,]+)\s+items/i);
+                if (!m) return '1';
+                var total = parseInt(m[1].replace(/,/g, ''), 10);
+                if (!total || total < 1) return '1';
+                return String(Math.max(1, Math.ceil(total / 20)));
             })()
         """.trimIndent()
 
@@ -327,7 +333,7 @@ internal class ComixToChapterScraper(private val context: Context) {
                 var entries = performance.getEntriesByType('resource');
                 for (var i = entries.length - 1; i >= 0; i--) {
                     var name = entries[i] && entries[i].name ? entries[i].name : '';
-                    if (name.indexOf('/api/v2/manga/') !== -1 && name.indexOf('/chapters?') !== -1) {
+                    if ((name.indexOf('/api/v1/manga/') !== -1 || name.indexOf('/api/v2/manga/') !== -1) && name.indexOf('/chapters?') !== -1) {
                         return name;
                     }
                 }

@@ -73,7 +73,13 @@ internal class SettingsViewModel @Inject constructor(
         libraryAutoUpdate = SettingsScreenState.LibraryAutoUpdate(
             autoDownloadNewChapters = appPreferences.GLOBAL_APP_AUTOMATIC_DOWNLOAD_NEW_CHAPTERS.state(
                 viewModelScope
-            )
+            ),
+            autoUpdateEnabled = appPreferences.GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_ENABLED.state(
+                viewModelScope
+            ),
+            autoUpdateIntervalHours = appPreferences.GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_INTERVAL_HOURS.state(
+                viewModelScope
+            ),
         ),
         geminiApiKey = appPreferences.TRANSLATION_GEMINI_API_KEY.state(viewModelScope),
         geminiModel = appPreferences.TRANSLATION_GEMINI_MODEL.state(viewModelScope),

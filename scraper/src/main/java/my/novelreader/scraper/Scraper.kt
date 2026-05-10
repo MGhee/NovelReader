@@ -2,6 +2,7 @@ package my.novelreader.scraper
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import my.novelreader.core.AppFileResolver
 import my.novelreader.network.NetworkClient
 import my.novelreader.scraper.databases.BakaUpdates
 import my.novelreader.scraper.databases.NovelUpdates
@@ -39,6 +40,7 @@ import my.novelreader.scraper.sources.MangaDex
 import my.novelreader.scraper.sources.KingOfShojo
 import my.novelreader.scraper.sources.AsuraScans
 import my.novelreader.scraper.sources.ComixTo
+import my.novelreader.scraper.sources.Elscione
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,7 +48,8 @@ import javax.inject.Singleton
 class Scraper @Inject constructor(
     @ApplicationContext appContext: Context,
     networkClient: NetworkClient,
-    localSource: LocalSource
+    localSource: LocalSource,
+    appFileResolver: AppFileResolver,
 ) {
     val databasesList = setOf(
         NovelUpdates(networkClient),
@@ -89,6 +92,7 @@ class Scraper @Inject constructor(
         KingOfShojo(networkClient),
         AsuraScans(networkClient),
         ComixTo(networkClient, appContext),
+        Elscione(networkClient, appFileResolver, appContext),
     )
 
     val sourcesCatalogsList = sourcesList.filterIsInstance<SourceInterface.Catalog>()

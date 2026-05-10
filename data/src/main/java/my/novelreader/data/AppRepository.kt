@@ -12,6 +12,8 @@ import my.novelreader.feature.local_database.AppDatabase
 import my.novelreader.feature.local_database.tables.Book
 import my.novelreader.feature.local_database.tables.Chapter
 import my.novelreader.feature.local_database.tables.ContentType
+import my.novelreader.interactor.WorkersInteractions
+import my.novelreader.scraper.LightNovelSourceInterface
 import my.novelreader.scraper.MangaSourceInterface
 import my.novelreader.scraper.Scraper
 import javax.inject.Inject
@@ -28,6 +30,7 @@ class AppRepository @Inject constructor(
     private val appFileResolver: AppFileResolver,
     private val epubImporterRepository: EpubImporterRepository,
     private val scraper: Scraper,
+    private val workersInteractions: WorkersInteractions,
 ) {
     val settings = Settings()
     val eventDataRestored = MutableSharedFlow<Unit>()
@@ -41,13 +44,26 @@ class AppRepository @Inject constructor(
                 addToLibrary = true
             ) is Response.Success
         } else {
+            val source = scraper.getCompatibleSource(realUrl)
             // Detect if this is a manga source
-            val contentType = if (scraper.getCompatibleSource(realUrl) is MangaSourceInterface) {
+            val contentType = if (source is MangaSourceInterface) {
                 ContentType.MANGA
             } else {
                 ContentType.NOVEL
             }
-            libraryBooks.toggleBookmark(bookUrl = realUrl, bookTitle = bookTitle, contentType = contentType)
+            val added = libraryBooks.toggleBookmark(
+                bookUrl = realUrl,
+                bookTitle = bookTitle,
+                contentType = contentType,
+            )
+            // Auto-download volume 1 for fresh light-novel adds (skip re-adds where any
+            // volume body is already on disk).
+            if (added && source is LightNovelSourceInterface &&
+                chapterBody.getDownloadedCount(realUrl) == 0
+            ) {
+                workersInteractions.downloadFirstVolume(realUrl)
+            }
+            added
         }
     }
 

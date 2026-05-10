@@ -17,6 +17,7 @@ internal data class ReaderScreenState(
     val settings: Settings,
     val showInvalidChapterDialog: MutableState<Boolean>,
     val showChapterList: MutableState<Boolean> = mutableStateOf(false),
+    val overlayChapterUrl: MutableState<String> = mutableStateOf(""),
 ) {
     data class CurrentInfo(
         val bookTitle: State<String>,

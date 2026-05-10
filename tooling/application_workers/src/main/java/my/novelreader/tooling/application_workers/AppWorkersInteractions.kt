@@ -41,6 +41,15 @@ internal class AppWorkersInteractions @Inject constructor(
         Timber.d("AppWorkersInteractions: download enqueued for $bookUrl")
     }
 
+    override fun downloadFirstVolume(bookUrl: String) {
+        Timber.d("AppWorkersInteractions: enqueueing first-volume download for $bookUrl")
+        workManager.beginUniqueWork(
+            "ChapterDownload_$bookUrl",
+            ExistingWorkPolicy.KEEP,
+            ChapterDownloadWorker.createRequest(bookUrl, chapterLimit = 1)
+        ).enqueue()
+    }
+
     override fun cancelDownload(bookUrl: String) {
         workManager.cancelUniqueWork("ChapterDownload_$bookUrl")
     }

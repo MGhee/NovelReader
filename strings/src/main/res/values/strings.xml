@@ -206,6 +206,13 @@
     <string name="new_app_version_found_s">New app version found %s</string>
     <string name="automatically_download_new_chapters">Automatically download new chapters</string>
     <string name="automatically_download_new_chapters_description">Download chapters immediately when new ones are detected</string>
+    <string name="library_updates">Library updates</string>
+    <string name="automatically_update_library">Automatically check for new chapters</string>
+    <string name="automatically_update_library_description">Periodically scan your library for newly released chapters</string>
+    <string name="library_update_interval">Check interval</string>
+    <string name="library_update_interval_6h">Every 6 hours</string>
+    <string name="library_update_interval_12h">Every 12 hours</string>
+    <string name="library_update_interval_24h">Daily</string>
     <string name="cloudfare_firewall_detected">Cloudfare firewall detected</string>
     <string name="please_open_web_view_and_try_verify_then_reload">Please open web view and try verify, then reload</string>
     <string name="cloudfare_firewall_failed_bypass">Cloudfare firewall failed bypass</string>
@@ -266,6 +273,7 @@
 
     <!-- Finder Tabs -->
     <string name="finder_tab_novels">Novels</string>
+    <string name="finder_tab_light_novels">Light Novels</string>
     <string name="finder_tab_manga">Manga</string>
 
     <!-- Manga Reader Strings -->

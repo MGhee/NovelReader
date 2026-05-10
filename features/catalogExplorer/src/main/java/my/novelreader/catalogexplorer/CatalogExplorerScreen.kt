@@ -35,6 +35,7 @@ import my.novelreader.coreui.components.CollapsibleDivider
 import my.novelreader.coreui.components.TopAppBarSearch
 import my.novelreader.coreui.components.ToolbarMode
 import my.novelreader.navigation.NavigationRouteViewModel
+import my.novelreader.scraper.LightNovelSourceInterface
 import my.novelreader.scraper.MangaSourceInterface
 import my.novelreader.strings.R as StringsR
 
@@ -70,14 +71,16 @@ fun CatalogExplorerScreen(
 
     val tabTitles = listOf(
         stringResource(StringsR.string.finder_tab_novels),
+        stringResource(StringsR.string.finder_tab_light_novels),
         stringResource(StringsR.string.finder_tab_manga),
     )
 
     // Filter sources by tab selection
     val filteredSources = viewModel.sourcesList.filter { item ->
         when (selectedTab) {
-            0 -> item.catalog !is MangaSourceInterface
-            1 -> item.catalog is MangaSourceInterface
+            0 -> item.catalog !is MangaSourceInterface && item.catalog !is LightNovelSourceInterface
+            1 -> item.catalog is LightNovelSourceInterface
+            2 -> item.catalog is MangaSourceInterface
             else -> true
         }
     }

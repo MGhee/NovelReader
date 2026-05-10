@@ -107,7 +107,13 @@ open class MainActivity : BaseActivity() {
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = MaterialTheme.colorApp.accent,
                                     selectedTextColor = MaterialTheme.colorApp.accent,
-                                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    // Themes whose `secondaryContainer` collapses onto the
+                                    // same hue as `accent` (Ocean, Purple, …) made the
+                                    // selected icon disappear into the indicator pill.
+                                    // Use a translucent accent so the pill is always a
+                                    // lighter shade than the icon drawn on top of it.
+                                    indicatorColor = MaterialTheme.colorApp.accent
+                                        .copy(alpha = 0.20f),
                                 )
                             )
                         }

@@ -62,6 +62,7 @@ import my.novelreader.features.reader.domain.ReaderState
 import my.novelreader.features.reader.domain.indexOfReaderItem
 import my.novelreader.features.reader.view.ReaderLayoutManager
 import my.novelreader.features.reader.tools.FontsLoader
+import my.novelreader.features.reader.ui.LightNovelDownloadOverlay
 import my.novelreader.features.reader.ui.ReaderScreen
 import my.novelreader.features.reader.ui.ReaderViewHandlersActions
 import my.novelreader.navigation.NavigationRoutes
@@ -718,6 +719,14 @@ class ReaderActivity : BaseActivity() {
                         },
                     )
 
+                val activeChapterUrl = viewModel.state.overlayChapterUrl.value
+                    .ifBlank { viewModel.state.readerInfo.chapterUrl.value }
+                LightNovelDownloadOverlay(
+                    chapterUrl = activeChapterUrl,
+                    chapterTitle = viewModel.state.readerInfo.chapterTitle.value,
+                    bookTitle = viewModel.state.readerInfo.bookTitle.value,
+                )
+
                 if (viewModel.state.showInvalidChapterDialog.value) {
                     BasicAlertDialog(onDismissRequest = {
                         viewModel.state.showInvalidChapterDialog.value = false
@@ -938,6 +947,8 @@ class ReaderActivity : BaseActivity() {
      */
     private fun recalculatePagesAndScrollToChapter(chapterUrl: String, chapterIndex: Int) {
         isLoadingNewChapter = true
+        viewModel.chapterUrl = chapterUrl
+        viewModel.state.overlayChapterUrl.value = chapterUrl
 
         // Cancel any pending async page calculations to prevent them from overriding us later
         pageCalculationJob?.cancel()
@@ -1002,6 +1013,8 @@ class ReaderActivity : BaseActivity() {
         if (currentIndex == -1 || currentIndex >= loader.orderedChapters.size - 1) return
 
         val nextChapter = loader.orderedChapters[currentIndex + 1]
+        viewModel.chapterUrl = nextChapter.url
+        viewModel.state.overlayChapterUrl.value = nextChapter.url
 
         // Check if the title exists in items (covers both fully loaded and still-loading chapters)
         val hasTitle = viewModel.items.any { it is ReaderItem.Title && it.chapterIndex == nextChapter.position }
@@ -1031,6 +1044,8 @@ class ReaderActivity : BaseActivity() {
         if (currentIndex <= 0) return
 
         val previousChapter = loader.orderedChapters[currentIndex - 1]
+        viewModel.chapterUrl = previousChapter.url
+        viewModel.state.overlayChapterUrl.value = previousChapter.url
 
         // Check if the title exists in items (covers both fully loaded and still-loading chapters)
         val hasTitle = viewModel.items.any { it is ReaderItem.Title && it.chapterIndex == previousChapter.position }

@@ -17,6 +17,7 @@ import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import my.novelreader.coreui.R
+import java.io.File
 
 @Composable
 fun ImageView(
@@ -53,11 +54,17 @@ fun ImageView(
         val context by rememberUpdatedState(LocalContext.current)
         val imageRequest by remember(model) {
             derivedStateOf {
-                ImageRequest
+                val currentModel = model
+                val builder = ImageRequest
                     .Builder(context)
-                    .data(model)
+                    .data(currentModel)
                     .crossfade(fadeInDurationMillis)
-                    .build()
+                if (currentModel is File) {
+                    val key = "${currentModel.absolutePath}#${currentModel.lastModified()}"
+                    builder.memoryCacheKey(key)
+                    builder.diskCacheKey(key)
+                }
+                builder.build()
             }
         }
         val imageErrorRequest by remember(error) {

@@ -35,7 +35,18 @@ data class SyncBook(
     val description: String? = null,
     val currentChapterUrl: String? = null,
     val updatedAt: String,
+    val type: String = "WEB_NOVEL",
 )
+
+private fun contentTypeToWire(c: ContentType): String = when (c) {
+    ContentType.MANGA -> "MANGA"
+    ContentType.NOVEL -> "WEB_NOVEL"
+}
+
+private fun wireToContentType(s: String?): ContentType = when (s) {
+    "MANGA", "MANHWA" -> ContentType.MANGA
+    else -> ContentType.NOVEL
+}
 
 @Serializable
 data class SyncMergedBook(
@@ -118,6 +129,7 @@ class SyncRepository @Inject constructor(
                         description = obj["description"]?.jsonPrimitive?.content,
                         currentChapterUrl = obj["currentChapterUrl"]?.jsonPrimitive?.content,
                         updatedAt = obj["updatedAt"]?.jsonPrimitive?.content ?: "",
+                        type = obj["type"]?.jsonPrimitive?.content ?: "WEB_NOVEL",
                     )
                 }
 
@@ -160,6 +172,7 @@ class SyncRepository @Inject constructor(
                     "coverUrl" to book.coverImageUrl,
                     "description" to book.description,
                     "updatedAt" to System.currentTimeMillis().toString(),
+                    "type" to contentTypeToWire(book.contentType),
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Failed to build sync data for book: ${book.url}")
@@ -195,6 +208,7 @@ class SyncRepository @Inject constructor(
                                 put("coverUrl", book["coverUrl"] as? String ?: "")
                                 put("description", book["description"] as? String ?: "")
                                 put("updatedAt", book["updatedAt"] as String)
+                                put("type", book["type"] as String)
                                 put("chapters", buildJsonArray {
                                     @Suppress("UNCHECKED_CAST")
                                     val chapters = book["chapters"] as List<Map<String, Any>>
@@ -274,6 +288,7 @@ class SyncRepository @Inject constructor(
                             put("coverUrl", syncBook["coverUrl"] as? String ?: "")
                             put("description", syncBook["description"] as? String ?: "")
                             put("updatedAt", syncBook["updatedAt"] as String)
+                            put("type", syncBook["type"] as String)
                             put("chapters", buildJsonArray {
                                 @Suppress("UNCHECKED_CAST")
                                 val chapters = syncBook["chapters"] as List<Map<String, Any>>
@@ -407,7 +422,7 @@ class SyncRepository @Inject constructor(
                                 inLibrary = true,
                                 coverImageUrl = serverBook.coverUrl ?: "",
                                 description = serverBook.description ?: "",
-                                contentType = ContentType.NOVEL
+                                contentType = wireToContentType(serverBook.type)
                             )
                         )
                         created++

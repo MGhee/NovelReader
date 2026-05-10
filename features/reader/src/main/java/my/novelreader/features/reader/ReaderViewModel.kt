@@ -107,7 +107,9 @@ internal class ReaderViewModel @Inject constructor(
             )
         ),
         showInvalidChapterDialog = mutableStateOf(false)
-    )
+    ).also {
+        it.overlayChapterUrl.value = chapterUrl
+    }
 
     init {
         readerViewHandlersActions.showInvalidChapterDialog = {
@@ -187,6 +189,8 @@ internal class ReaderViewModel @Inject constructor(
         }
 
         saveCurrentReadingPosition()
+        this.chapterUrl = chapterUrl
+        state.overlayChapterUrl.value = chapterUrl
         readingCurrentChapter = ChapterState(
             chapterUrl = chapterUrl,
             chapterItemPosition = 0,

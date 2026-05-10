@@ -154,6 +154,8 @@ private fun Preview() {
                     ),
                     libraryAutoUpdate = SettingsScreenState.LibraryAutoUpdate(
                         autoDownloadNewChapters = remember { mutableStateOf(false) },
+                        autoUpdateEnabled = remember { mutableStateOf(true) },
+                        autoUpdateIntervalHours = remember { mutableStateOf(24) },
                     ),
                     geminiApiKey = remember { derivedStateOf { "" } },
                     geminiModel = remember { derivedStateOf { "" } },

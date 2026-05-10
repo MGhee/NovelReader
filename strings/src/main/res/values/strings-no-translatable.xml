@@ -35,5 +35,6 @@
     <string translatable="false" name="source_mangadex">MangaDex</string>
     <string translatable="false" name="source_kingofshojo">King of Shojo</string>
     <string translatable="false" name="source_comixto">Comix.to</string>
+    <string translatable="false" name="source_name_elscione">Elscione Light Novels</string>
 
 </resources>

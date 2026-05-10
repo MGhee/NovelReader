@@ -29,6 +29,8 @@ import my.novelreader.core.tryAsResponse
 import my.novelreader.feature.local_database.tables.Book
 import my.novelreader.tooling.application_workers.notifications.LibraryUpdateNotification
 import timber.log.Timber
+import java.time.Duration
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
 @HiltWorker
@@ -66,9 +68,15 @@ internal class LibraryUpdatesWorker @AssistedInject constructor(
             return builder
                 .addTag(TAG)
                 .setConstraints(constrains)
-                .setInitialDelay(30, TimeUnit.MINUTES)
+                .setInitialDelay(millisUntilNextMidnight(), TimeUnit.MILLISECONDS)
                 .setInputData(createInputData(updateCategory))
                 .build()
+        }
+
+        private fun millisUntilNextMidnight(): Long {
+            val now = ZonedDateTime.now()
+            val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay(now.zone)
+            return Duration.between(now, nextMidnight).toMillis()
         }
 
         fun createManualRequest(

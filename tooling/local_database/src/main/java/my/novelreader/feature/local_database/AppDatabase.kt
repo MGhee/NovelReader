@@ -81,7 +81,7 @@ interface AppDatabase {
         SavedSearch::class,
         LibraryUpdateError::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 internal abstract class AppRoomDatabase : RoomDatabase(), AppDatabase {

@@ -196,6 +196,16 @@ class AppPreferences @Inject constructor(
             override var value by SharedPreference_Boolean(name, preferences, false)
         }
 
+    val GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_ENABLED =
+        object : Preference<Boolean>("GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_ENABLED") {
+            override var value by SharedPreference_Boolean(name, preferences, true)
+        }
+
+    val GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_INTERVAL_HOURS =
+        object : Preference<Int>("GLOBAL_APP_AUTOMATIC_LIBRARY_UPDATES_INTERVAL_HOURS") {
+            override var value by SharedPreference_Int(name, preferences, 24)
+        }
+
     val TRANSLATION_GEMINI_API_KEY =
         object : Preference<String>("TRANSLATION_GEMINI_API_KEY") {
             override var value by SharedPreference_String(name, preferences, "")
@@ -214,8 +224,8 @@ class AppPreferences @Inject constructor(
     // Sync preferences
     val SYNC_SERVER_URL =
         object : Preference<String>("SYNC_SERVER_URL") {
-            //override var value by SharedPreference_String(name, preferences, "https://novelapp.viktorbarzin.me")
-            override var value by SharedPreference_String(name, preferences, "http://192.168.1.104:3000")
+            override var value by SharedPreference_String(name, preferences, "https://novelapp.viktorbarzin.me")
+            //override var value by SharedPreference_String(name, preferences, "http://192.168.1.104:3000")
         }
 
     val SYNC_ENABLED =

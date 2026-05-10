@@ -50,10 +50,14 @@ class AppFileResolver @Inject constructor(
             imagePath.isLocalUri -> getLocalBookFolderName(bookFolderName)
             else -> bookFolderName
         }
+        // Strip any cache-bust fragment (e.g. "local://__cover_image#1700000000") so it
+        // doesn't end up appended to the on-disk path. The fragment exists only to force
+        // Coil/Compose to treat the URL as new when the underlying file changes between
+        // volume reads.
         return Paths.get(
             folderBooks.absolutePath,
             localBookFolderName.removeLocalUriPrefix,
-            imagePath.removeLocalUriPrefix
+            imagePath.removeLocalUriPrefix.substringBefore('#')
         ).toFile()
     }
 
