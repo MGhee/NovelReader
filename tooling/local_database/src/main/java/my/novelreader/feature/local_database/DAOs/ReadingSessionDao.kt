@@ -17,6 +17,15 @@ interface ReadingSessionDao {
     @Query("UPDATE ReadingSession SET endTimeEpochMilli = :endTime, chaptersRead = :chaptersRead WHERE id = :id")
     suspend fun endSession(id: Long, endTime: Long, chaptersRead: Int)
 
+    @Query("""
+        UPDATE ReadingSession SET endTimeEpochMilli = CASE
+            WHEN :now - startTimeEpochMilli > 14400000 THEN startTimeEpochMilli + 14400000
+            ELSE :now
+        END
+        WHERE endTimeEpochMilli = 0 AND id != :excludeId
+    """)
+    suspend fun closeOrphanedSessions(now: Long, excludeId: Long = 0)
+
     @Query("SELECT * FROM ReadingSession WHERE endTimeEpochMilli > 0 ORDER BY startTimeEpochMilli DESC")
     fun getAllCompleted(): Flow<List<ReadingSession>>
 
@@ -49,6 +58,16 @@ interface ReadingSessionDao {
     """)
     fun dailyStats(sinceEpochMilli: Long): Flow<List<DailyReadingStats>>
 
+    @Query("""
+        SELECT (startTimeEpochMilli / 86400000) as dayEpoch,
+               SUM(endTimeEpochMilli - startTimeEpochMilli) as totalTimeMillis,
+               SUM(chaptersRead) as totalChapters
+        FROM ReadingSession
+        WHERE endTimeEpochMilli > 0
+        GROUP BY dayEpoch ORDER BY dayEpoch ASC
+    """)
+    fun allDailyStats(): Flow<List<DailyReadingStats>>
+
     @Query("SELECT SUM(chaptersRead) FROM ReadingSession WHERE endTimeEpochMilli > 0")
     fun totalChaptersRead(): Flow<Int?>
 
@@ -61,4 +80,11 @@ interface ReadingSessionDao {
         ORDER BY startTimeEpochMilli DESC
     """)
     fun allSessionTimestamps(sinceEpochMilli: Long): Flow<List<SessionTimestamp>>
+
+    @Query("""
+        SELECT startTimeEpochMilli, (endTimeEpochMilli - startTimeEpochMilli) as durationMillis
+        FROM ReadingSession WHERE endTimeEpochMilli > 0
+        ORDER BY startTimeEpochMilli DESC
+    """)
+    fun allSessionTimestampsAllTime(): Flow<List<SessionTimestamp>>
 }

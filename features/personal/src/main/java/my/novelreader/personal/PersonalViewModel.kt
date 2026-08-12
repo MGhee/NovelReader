@@ -48,9 +48,9 @@ class PersonalViewModel @Inject constructor(
                     .map { it ?: 0 }.onStart { emit(0) }
                 val totalReadingTimeFlow = appRepository.readingStats.totalReadingTime()
                     .map { it ?: 0L }.onStart { emit(0L) }
-                val dailyStatsFlow = appRepository.readingStats.dailyStatsYear()
+                val dailyStatsFlow = appRepository.readingStats.dailyStatsAllTime()
                     .onStart { emit(emptyList()) }
-                val sessionTimestampsFlow = appRepository.readingStats.allSessionTimestamps(sinceDaysAgo = 365 * 3)
+                val sessionTimestampsFlow = appRepository.readingStats.allSessionTimestampsAllTime()
                     .onStart { emit(emptyList()) }
                 val avgDurationFlow = appRepository.readingStats.averageSessionDuration()
                     .map { it ?: 0L }.onStart { emit(0L) }

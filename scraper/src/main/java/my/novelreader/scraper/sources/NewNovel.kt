@@ -25,19 +25,19 @@ class NewNovel(
 ) : BaseNovelFullScraper(networkClient) {
     override val id = "newnovel"
     override val nameStrId = R.string.source_name_newnovel
-    override val baseUrl = "https://newnovel.org/"
-    override val catalogUrl = "https://novlove.com/sort/nov-love-daily-update"
-    override val iconUrl = "https://newnovel.org/favicon.ico"
+    override val baseUrl = "https://novelfull.com/"
+    override val catalogUrl = "https://novelfull.com/latest-release-novel"
+    override val iconUrl = "https://novelfull.com/favicon.ico"
     override val language = LanguageCode.ENGLISH
 
-    override val selectCatalogItems = "#list-page .row"
-    override val selectCatalogItemTitle = "div.col-xs-7 > div > h3 > a"
-    override val selectCatalogItemCover = "div.col-xs-3 > div > img"
+    override val selectCatalogItems = ".list-truyen .row"
+    override val selectCatalogItemTitle = "h3.truyen-title a"
+    override val selectCatalogItemCover = "div.col-xs-3 img"
 
-    override val selectSearchItems: String = "#list-page .row"
-    override val selectSearchItemTitle: String = "div.col-xs-7 > div > h3 > a"
-    override val selectSearchItemUrl: String = "a[href]"
-    override val selectSearchItemCover: String = "div.col-xs-3 > div > img"
+    override val selectSearchItems: String = ".list-truyen .row"
+    override val selectSearchItemTitle: String = "h3.truyen-title a"
+    override val selectSearchItemUrl: String = "h3.truyen-title a"
+    override val selectSearchItemCover: String = "div.col-xs-3 img"
     override val selectPaginationLastPage = "ul.pagination li:last-child"
 
     fun extractLastPageNumber(doc: Document): Int {
@@ -83,7 +83,7 @@ class NewNovel(
                 doc.select("ul.list-chapter li a").map { element ->
                     ChapterResult(
                         title = element.text() ?: "",
-                        url = ("https://newnovel.org" + element.attr("href"))
+                        url = ("https://novelfull.com" + element.attr("href"))
                     )
                 }
             }
@@ -106,7 +106,7 @@ class NewNovel(
             doc.selectFirst("#chapter-content")?.let { element ->
                 element.select("script").remove()
                 element.select(".ads").remove()
-                element.select("div:contains(newnovel.org)").remove()
+                element.select("div:contains(novelfull.com)").remove()
                 element.select("p:contains(If you find any errors)").remove()
                 TextExtractor.get(element)
             } ?: ""

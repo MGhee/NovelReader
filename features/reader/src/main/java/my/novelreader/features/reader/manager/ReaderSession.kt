@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -192,6 +193,21 @@ internal class ReaderSession(
                 android.util.Log.e("ReaderSession", "Failed to start reading session", e)
             }
         }
+        // Periodic heartbeat: save session progress every 30 seconds
+        // so data survives crashes and force-closes
+        scope.launch {
+            while (isActive) {
+                delay(30_000)
+                if (currentSessionId > 0) {
+                    try {
+                        appRepository.readingStats.endSession(currentSessionId, chaptersReadInSession)
+                        android.util.Log.d("ReaderSession", "Heartbeat: session=$currentSessionId, chapters=$chaptersReadInSession")
+                    } catch (e: Exception) {
+                        android.util.Log.e("ReaderSession", "Heartbeat failed", e)
+                    }
+                }
+            }
+        }
         initReaderTTSObservers()
     }
 
@@ -303,16 +319,16 @@ internal class ReaderSession(
         }
         readerTextToSpeech.onClose()
 
-        // End reading session - launch with NonCancellable to survive scope cancellation
+        // End reading session synchronously to ensure it completes before scope cancellation
         if (currentSessionId > 0) {
-            scope.launch(kotlinx.coroutines.NonCancellable) {
-                try {
-                    android.util.Log.d("ReaderSession", "Ending session: id=$currentSessionId, chaptersRead=$chaptersReadInSession")
+            try {
+                android.util.Log.d("ReaderSession", "Ending session: id=$currentSessionId, chaptersRead=$chaptersReadInSession")
+                runBlocking(Dispatchers.IO) {
                     appRepository.readingStats.endSession(currentSessionId, chaptersReadInSession)
-                    android.util.Log.d("ReaderSession", "Session ended successfully: id=$currentSessionId")
-                } catch (e: Exception) {
-                    android.util.Log.e("ReaderSession", "Failed to end reading session", e)
                 }
+                android.util.Log.d("ReaderSession", "Session ended successfully: id=$currentSessionId")
+            } catch (e: Exception) {
+                android.util.Log.e("ReaderSession", "Failed to end reading session", e)
             }
         } else {
             android.util.Log.w("ReaderSession", "No session to end (currentSessionId=0)")

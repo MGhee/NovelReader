@@ -11,9 +11,9 @@ class NovelBinCom(
 ) : BaseNovelFullScraper(networkClient) {
     override val id = "novelbin_com"
     override val nameStrId = R.string.source_name_novelbin_com
-    override val baseUrl = "https://novelbin.me/"
-    override val catalogUrl = "https://novelbin.me/sort/latest"
-    override val iconUrl = "https://novelbin.me/favicon.ico"
+    override val baseUrl = "https://www.novelbin.cc/"
+    override val catalogUrl = "https://www.novelbin.cc/dayvisit/"
+    override val iconUrl = "https://www.novelbin.cc/favicon.ico"
     override val language = LanguageCode.ENGLISH
 
     // Catalog selectors
@@ -41,7 +41,7 @@ class NovelBinCom(
     override fun buildCatalogUrl(index: Int): String {
         val page = index + 1
         return if (page == 1) catalogUrl
-        else "$catalogUrl?page=$page"
+        else "${catalogUrl}?page=$page"
     }
 
     override fun buildSearchUrl(index: Int, input: String): String {

@@ -139,9 +139,11 @@ internal class ChaptersViewModel @Inject constructor(
 
         viewModelScope.launch {
             chaptersRepository.getChaptersSortedFlow(bookUrl = bookUrl).collect {
+                android.util.Log.d("ChaptersVM", "Flow emitted ${it.size} chapters for $bookUrl")
                 allChapters = it
                 syncChapterSourceOptions(it)
                 applyChapterSourceFilter()
+                android.util.Log.d("ChaptersVM", "After filter: ${state.chapters.size} chapters displayed, selectedSource=${state.selectedChapterSource.value}")
             }
         }
 
@@ -227,16 +229,20 @@ internal class ChaptersViewModel @Inject constructor(
             state.error.value = ""
             state.isRefreshing.value = true
             val url = bookUrl
+            android.util.Log.d("ChaptersVM", "Fetching chapters for: $url")
             downloaderRepository.bookChaptersList(bookUrl = url)
                 .onSuccess {
+                    android.util.Log.d("ChaptersVM", "Fetched ${it.size} chapters, first=${it.firstOrNull()?.url}")
                     if (it.isEmpty())
                         toasty.show(R.string.no_chapters_found)
                     appRepository.bookChapters.merge(newChapters = it, bookUrl = url)
+                    android.util.Log.d("ChaptersVM", "Merge complete for $url")
                     // Auto-download new chapters for library books
                     if (appRepository.libraryBooks.existInLibrary(url)) {
                         workersInteractions.downloadAllBookChapters(url)
                     }
                 }.onError {
+                    android.util.Log.e("ChaptersVM", "Error fetching chapters: ${it.message}")
                     state.error.value = it.message
                 }
             state.isRefreshing.value = false

@@ -15,7 +15,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import my.novelreader.core.domain.CloudfareVerificationBypassFailedException
 import my.novelreader.core.domain.WebViewCookieManagerInitializationFailedException
-import android.content.Intent
 import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.Response
@@ -174,74 +173,74 @@ internal class CloudFareVerificationInterceptor(
             Log.d(TAG, "Forcing fresh challenge (existing cookie was invalid)")
         }
 
-        // Launch WebView for manual challenge
-        Log.d(TAG, "Launching WebView for manual challenge")
-        withContext(Dispatchers.Main) {
-            val intent = Intent().apply {
-                setClassName(appContext, "my.novelreader.webview.WebViewActivity")
-                putExtra("url", url)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // Create a headless (invisible) WebView to solve the challenge in the background
+        Log.d(TAG, "Creating background WebView for Cloudflare challenge")
+        val webView = withContext(Dispatchers.Main) {
+            WebView(appContext).apply {
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                webViewClient = WebViewClient()
+                loadUrl(url)
             }
-            appContext.startActivity(intent)
         }
 
-        // Wait for the user to solve the challenge
-        val maxAttempts = 120 // 2 minutes timeout
-        var attempts = 0
-        var challengeSolved = false
-        
-        // Store the initial cookie state to detect NEW cookies
-        cookieManager.flush()
-        val initialCookies = cookieManager.getCookie(url) ?: ""
-        val hadClearanceInitially = initialCookies.contains("cf_clearance")
-        
-        // If forcing challenge, we expect the cookie to change
-        val minWaitTime = if (forceChallenge && hadClearanceInitially) 3 else 1
-        
-        Log.d(TAG, "Waiting for challenge resolution (minWait=${minWaitTime}s, hadClearance=$hadClearanceInitially)")
-        
-        while (!challengeSolved && attempts < maxAttempts) {
-            delay(1.seconds)
-            attempts++
-            
-            // Flush cookies to ensure they're written
+        try {
+            // Wait for the JS challenge to be solved automatically
+            val maxAttempts = 120 // 2 minutes timeout
+            var attempts = 0
+            var challengeSolved = false
+
+            // Store the initial cookie state to detect NEW cookies
             cookieManager.flush()
-            
-            // Get ALL cookies from the page
-            val allCookies = cookieManager.getCookie(url) ?: ""
-            
-            // Log cookies every 10 seconds for debugging
-            if (attempts % 10 == 0) {
-                Log.d(TAG, "Attempt $attempts/$maxAttempts - Waiting for cf_clearance...")
-            }
-            
-            // Only accept cookie after minimum wait time
-            // This prevents accepting old cookies that weren't properly cleared
-            if (attempts >= minWaitTime && allCookies.contains("cf_clearance")) {
-                // If we're forcing a challenge and had a cookie initially,
-                // verify the cookie value changed
-                if (forceChallenge && hadClearanceInitially) {
-                    if (allCookies != initialCookies) {
-                        Log.d(TAG, "cf_clearance cookie changed! Challenge solved after $attempts seconds.")
-                        challengeSolved = true
+            val initialCookies = cookieManager.getCookie(url) ?: ""
+            val hadClearanceInitially = initialCookies.contains("cf_clearance")
+
+            // If forcing challenge, we expect the cookie to change
+            val minWaitTime = if (forceChallenge && hadClearanceInitially) 3 else 1
+
+            Log.d(TAG, "Waiting for background challenge resolution (minWait=${minWaitTime}s)")
+
+            while (!challengeSolved && attempts < maxAttempts) {
+                delay(1.seconds)
+                attempts++
+
+                cookieManager.flush()
+                val allCookies = cookieManager.getCookie(url) ?: ""
+
+                if (attempts % 10 == 0) {
+                    Log.d(TAG, "Attempt $attempts/$maxAttempts - Waiting for cf_clearance...")
+                }
+
+                if (attempts >= minWaitTime && allCookies.contains("cf_clearance")) {
+                    if (forceChallenge && hadClearanceInitially) {
+                        if (allCookies != initialCookies) {
+                            Log.d(TAG, "cf_clearance cookie changed! Challenge solved after $attempts seconds.")
+                            challengeSolved = true
+                        } else {
+                            Log.d(TAG, "cf_clearance found but unchanged, continuing to wait...")
+                        }
                     } else {
-                        Log.d(TAG, "cf_clearance found but unchanged, continuing to wait...")
+                        Log.d(TAG, "cf_clearance cookie found! Challenge solved after $attempts seconds.")
+                        challengeSolved = true
                     }
-                } else {
-                    Log.d(TAG, "cf_clearance cookie found! Challenge solved after $attempts seconds.")
-                    challengeSolved = true
                 }
             }
-        }
-        
-        if (!challengeSolved) {
-            Log.w(TAG, "Challenge NOT solved after $attempts attempts")
-        }
-        
-        // Give extra time for cookies to fully sync
-        if (challengeSolved) {
-            cookieManager.flush()
-            delay(2.seconds)
+
+            if (!challengeSolved) {
+                Log.w(TAG, "Background challenge NOT solved after $attempts attempts")
+            }
+
+            // Give extra time for cookies to fully sync
+            if (challengeSolved) {
+                cookieManager.flush()
+                delay(2.seconds)
+            }
+        } finally {
+            // Clean up the headless WebView
+            withContext(Dispatchers.Main) {
+                webView.stopLoading()
+                webView.destroy()
+            }
         }
     }
 }

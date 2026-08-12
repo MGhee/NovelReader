@@ -25,7 +25,7 @@ class FreeWebNovel(
     override val id = "freewebnovel"
     override val nameStrId = R.string.source_name_freewebnovel
     override val baseUrl = "https://freewebnovel.com"
-    override val catalogUrl = "https://freewebnovel.com/completed-novel/"
+    override val catalogUrl = "https://freewebnovel.com/sort/completed-novel"
     override val iconUrl = "https://freewebnovel.com/favicon.ico"
     override val language = LanguageCode.ENGLISH
 
@@ -50,8 +50,9 @@ class FreeWebNovel(
             tryConnect {
                 networkClient.get(bookUrl)
                     .toDocument()
-                    .selectFirst(".pic img")?.attr("src")
-                    ?.let {baseUrl + it}
+                    .selectFirst(".pic img")?.let { img ->
+                        img.attr("data-src").ifEmpty { img.attr("src") }
+                    }?.let { if (it.startsWith("http")) it else baseUrl + it }
             }
 
 
@@ -77,8 +78,8 @@ class FreeWebNovel(
                 .select("#idData li a")
                 .map {
                     ChapterResult(
-                        title = it.selectFirst("a")?.attr("title") ?: "",
-                        url = (baseUrl + it.selectFirst("a")?.attr("href"))
+                        title = it.attr("title").ifEmpty { it.text() },
+                        url = baseUrl + it.attr("href")
                     )
                 }
         }
@@ -88,7 +89,7 @@ class FreeWebNovel(
         withContext(Dispatchers.Default) {
             tryConnect("index=$index") {
                 val page = index + 1
-                val url = "$baseUrl/completed-novel/$page"
+                val url = "$baseUrl/sort/completed-novel/$page"
 
                 val doc = networkClient.get(url).toDocument()
                 val books = doc.select(".ul-list1 .li-row")

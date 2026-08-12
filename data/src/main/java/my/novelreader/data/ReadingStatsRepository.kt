@@ -14,8 +14,11 @@ import java.util.Calendar
 class ReadingStatsRepository @Inject constructor(
     private val readingSessionDao: ReadingSessionDao,
 ) {
-    suspend fun startSession(bookUrl: String): Long =
-        readingSessionDao.insert(ReadingSession(bookUrl = bookUrl, startTimeEpochMilli = System.currentTimeMillis()))
+    suspend fun startSession(bookUrl: String): Long {
+        // Close any orphaned sessions from previous crashes/force-closes
+        readingSessionDao.closeOrphanedSessions(System.currentTimeMillis())
+        return readingSessionDao.insert(ReadingSession(bookUrl = bookUrl, startTimeEpochMilli = System.currentTimeMillis()))
+    }
 
     suspend fun endSession(sessionId: Long, chaptersRead: Int) =
         readingSessionDao.endSession(sessionId, System.currentTimeMillis(), chaptersRead)
@@ -52,5 +55,7 @@ class ReadingStatsRepository @Inject constructor(
         return readingSessionDao.allSessionTimestamps(since)
     }
 
-    fun dailyStatsYear(): Flow<List<DailyReadingStats>> = dailyStats(sinceDaysAgo = 365)
+    fun dailyStatsAllTime(): Flow<List<DailyReadingStats>> = readingSessionDao.allDailyStats()
+
+    fun allSessionTimestampsAllTime(): Flow<List<SessionTimestamp>> = readingSessionDao.allSessionTimestampsAllTime()
 }

@@ -46,6 +46,9 @@ abstract class BaseScraperTemplate(
     protected open fun transformBookUrl(url: String): String =
         if (url.startsWith("http")) url else baseUrl + url.removePrefix("/")
 
+    override suspend fun transformChapterUrl(url: String): String =
+        if (url.startsWith("http")) url else baseUrl + url.removePrefix("/")
+
     protected open fun chapterUrlTransform(url: String): String =
         if (url.startsWith("http")) url else baseUrl + url.removePrefix("/")
 

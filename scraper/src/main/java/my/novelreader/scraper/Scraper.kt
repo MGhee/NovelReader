@@ -23,7 +23,6 @@ import my.novelreader.scraper.sources.SakuraNovel
 import my.novelreader.scraper.sources.Sousetsuka
 import my.novelreader.scraper.sources.WbNovel
 import my.novelreader.scraper.sources.WuxiaWorld
-import my.novelreader.scraper.sources.ScribbleHub
 import my.novelreader.scraper.sources.FreeWebNovel
 import my.novelreader.scraper.sources.NovelFull
 import my.novelreader.scraper.sources.AllNovel
@@ -81,7 +80,6 @@ class Scraper @Inject constructor(
         MoreNovel(networkClient),
         Novelku(networkClient),
         WbNovel(networkClient),
-        ScribbleHub(networkClient),
         FreeWebNovel(networkClient),
         NovelFull(networkClient),
         AllNovel(networkClient),
