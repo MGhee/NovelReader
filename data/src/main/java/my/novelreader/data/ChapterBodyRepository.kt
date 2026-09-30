@@ -29,6 +29,7 @@ class ChapterBodyRepository @Inject constructor(
         private const val MANGA_PAGES_PREFIX = "MANGA_PAGES::"
     }
     suspend fun getAll() = chapterBodyDao.getAll()
+    suspend fun get(url: String) = chapterBodyDao.get(url)
     suspend fun insertReplace(chapterBodies: List<ChapterBody>) =
         chapterBodyDao.insertReplace(chapterBodies)
 

@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import my.novelreader.feature.local_database.tables.ContentType
 import my.novelreader.coreui.theme.ColorNotice
 import my.novelreader.navigation.NavigationRouteViewModel
+import my.novelreader.tooling.epub_importer.onDoExportEPUB
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +49,8 @@ fun LibraryScreen(
 
     val context by rememberUpdatedState(LocalContext.current)
     var showDropDown by remember { mutableStateOf(false) }
+    var showExportEpubPicker by remember { mutableStateOf(false) }
+    val exportEpub = onDoExportEPUB()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         snapAnimationSpec = null,
         flingAnimationSpec = null
@@ -88,7 +91,11 @@ fun LibraryScreen(
                             )
                             LibraryDropDown(
                                 expanded = showDropDown,
-                                onDismiss = { showDropDown = false }
+                                onDismiss = { showDropDown = false },
+                                onExportEpub = {
+                                    showDropDown = false
+                                    showExportEpubPicker = true
+                                }
                             )
                         }
                     }
@@ -169,6 +176,19 @@ fun LibraryScreen(
         visible = libraryModel.showBottomSheet,
         onDismiss = { libraryModel.showBottomSheet = false }
     )
+
+    if (showExportEpubPicker) {
+        ExportEpubBookPickerDialog(
+            books = libraryModel.list
+                .filter { it.book.contentType == ContentType.NOVEL }
+                .map { it.book },
+            onBookSelected = { book ->
+                showExportEpubPicker = false
+                exportEpub(book.url, book.title)
+            },
+            onDismiss = { showExportEpubPicker = false }
+        )
+    }
 
     
 

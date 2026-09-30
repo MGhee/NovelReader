@@ -7,5 +7,10 @@
 			android:foregroundServiceType="dataSync"
 			android:exported="false"
 			/>
+		<service
+			android:name=".EpubExportService"
+			android:foregroundServiceType="dataSync"
+			android:exported="false"
+			/>
 	</application>
 </manifest>

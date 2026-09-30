@@ -2,6 +2,7 @@ package my.novelreader.libraryexplorer
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -13,7 +14,8 @@ import my.novelreader.tooling.epub_importer.onDoImportEPUB
 @Composable
 internal fun LibraryDropDown(
     expanded: Boolean,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onExportEpub: () -> Unit,
 ) {
     DropdownMenu(
         expanded = expanded,
@@ -25,6 +27,13 @@ internal fun LibraryDropDown(
             },
             text = { Text(stringResource(id = R.string.import_epub)) },
             onClick = onDoImportEPUB()
+        )
+        DropdownMenuItem(
+            leadingIcon = {
+                Icon(Icons.Filled.SaveAlt, stringResource(id = R.string.export_epub))
+            },
+            text = { Text(stringResource(id = R.string.export_epub)) },
+            onClick = onExportEpub
         )
     }
 }
